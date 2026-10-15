@@ -1,0 +1,38 @@
+{
+  "name": "climbing-coach",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=@climbing-coach/web --filter=@climbing-coach/server",
+    "lint": "eslint apps packages --config eslint.config.js",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "deps:check": "dependency-cruiser --config dependency-cruiser.cjs packages apps",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm deps:check"
+  },
+  "devDependencies": {
+    "@climbing-coach/config": "workspace:*",
+    "@eslint/js": "^9.39.5",
+    "@lingui/conf": "^6.9.1",
+    "@types/node": "^22.13.10",
+    "dependency-cruiser": "^16.10.0",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.1",
+    "vitest": "^3.0.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
