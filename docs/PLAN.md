@@ -6,6 +6,9 @@ Build an app that lets climbers record bouldering videos, document their attempt
 analyze their movement over time. The app starts as a standalone local (desktop) application
 and then moves to iOS and Android.
 
+This is the product plan. The engineering plan (stack, modules, API, architecture, phases,
+test criteria, feedback loops) is in [`BUILD_PLAN.md`](./BUILD_PLAN.md).
+
 ## Requirements
 
 Functions:
@@ -37,14 +40,14 @@ alignment → comparison), not the UI. The architecture keeps that pipeline port
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ UI shell                                                    │
-│   Local: React web app (Vite) → packaged with Tauri later   │
+│   Local: React web app (Vite) → packaged with Electron      │
 │   Mobile: React Native / Expo (iOS + Android)               │
 ├─────────────────────────────────────────────────────────────┤
 │ Analysis engine (TypeScript, pure math, shared everywhere)  │
 │   segmentation · alignment (DTW) · metrics · insights       │
 ├─────────────────────────────────────────────────────────────┤
 │ Pose adapter (platform-specific, emits one JSON schema)     │
-│   Local: MediaPipe Pose Landmarker (Web/WASM) or Python     │
+│   Local: Python ml-worker (MediaPipe or RTMPose)            │
 │   iOS: MediaPipe iOS / Apple Vision · Android: MediaPipe    │
 ├─────────────────────────────────────────────────────────────┤
 │ Storage: SQLite (metadata) + files (video, pose JSON, thumbs)│
@@ -150,8 +153,8 @@ directly on 2.2 and 2.3.
    file per attempt. The cut is lossless by default (stream copy with keyframe snapping; the
    boundary is expanded outward to the nearest keyframe, never inward, so no climbing is
    lost) and falls back to a re-encode of only the head and tail GOPs when exact frame
-   boundaries are required. Desktop uses `ffmpeg`; mobile uses `AVAssetExportSession` (iOS) and
-   `MediaMuxer`/`MediaCodec` (Android) behind the same interface.
+   boundaries are required. Desktop uses `ffmpeg`; mobile uses AVFoundation (iOS) and Media3
+   Transformer (Android) behind the same interface.
 5. **Store.** Each clip becomes an `Attempt` in the library with its own `Video` record,
    thumbnail, and a `PoseTrack` sliced from the already-computed full-video track (no
    re-processing). The attempt stores a reference back to the original and its exact
@@ -345,19 +348,30 @@ recorded but no log exists.
 
 ## 3. Repository layout
 
+The full module layout, dependency rules, and API are in [`BUILD_PLAN.md`](./BUILD_PLAN.md)
+(sections 2–4). In summary:
+
 ```
 climbing-coach/
-  packages/
-    schema/        JSON Schema + TS types for PoseTrack, Attempt, Comparison (the contract)
-    engine/        TS: smoothing, segmentation, moves, DTW alignment, metrics, insights
-    pose-web/      MediaPipe Web adapter → PoseTrack
-    cutter/        Video cutting interface; ffmpeg (desktop), AVFoundation / MediaMuxer (mobile)
   apps/
-    desktop/       React + Vite local app (home/training log, library, auto-cut review, overlay, comparison, ratings)
+    desktop/       Electron shell
+    web/           React + Vite UI (home/training log, library, auto-cut review, overlay, comparison, ratings)
+    server/        Local Fastify API server
+    cli/           `coach` CLI for processing, cutting, eval
     mobile/        React Native / Expo (Phase 5)
+  packages/
+    schema/        Domain types, PoseTrack / posebin format, label formats (the contract)
+    engine/        TS: smoothing, detection, cut proposals, moves, DTW alignment, comparison, stats, insights
+    api/           API contract, `CoachApi` interface, HTTP client, conformance tests
+    core/          Application services and ports
+    db/            SQLite schema and migrations (Drizzle)
+    adapters-node/ ffmpeg video tools, ml-worker client, file store (desktop)
+    adapters-native/ Native pose and cutter modules, expo-sqlite (mobile)
+    render/  app-hooks/  ui-web/  test-fixtures/  config/
+  workers/
+    ml-worker/     Python: pose extraction and model training
   research/
-    harness/       Python: labeling tool, eval scripts, model bake-off
-    notebooks/
+    label-tool/  harness/  notebooks/
   docs/
 ```
 
@@ -377,8 +391,9 @@ climbing-coach/
 
 ### Phase 1 — Engine
 
-- `schema`, `engine`, `pose-web`, `cutter` packages; CLI that takes a video and emits
-  PoseTrack + cut proposals + Moves, and can apply a set of boundaries to produce clip files.
+- `schema` and `engine` packages, the `ml-worker` pose sidecar, and the ffmpeg video tools in
+  `adapters-node`; `coach` CLI that takes a video and emits PoseTrack + cut proposals + Moves,
+  and can apply a set of boundaries to produce clip files.
 - **Exit:** start frame within ±0.5 s on ≥ 90% of clips; fall recall ≥ 90% with top/fall
   confusion < 10%; synthetic-warp DTW test passes; lossless cut keeps every frame inside the
   requested range (verified by frame-hash comparison against the original).
@@ -395,7 +410,7 @@ climbing-coach/
 - **Exit:** a user can import a session recording, review and fine-tune the proposed cuts,
   produce one clip per attempt, rate them, log the day, and see the day on the homepage
   charts without touching a terminal. Median manual adjustment per boundary on the labeled
-  set is under 0.3 s. Package with Tauri if a double-clickable app is wanted.
+  set is under 0.3 s. Packaged as an Electron desktop app.
 
 ### Phase 3 — Comparison
 
@@ -414,8 +429,8 @@ climbing-coach/
 ### Phase 5 — Mobile
 
 - Expo app with `react-native-vision-camera` recording, native pose adapter (MediaPipe
-  iOS/Android; Apple Vision as an iOS fallback), the same `engine` package, native `cutter`
-  implementations (AVFoundation / MediaMuxer), SQLite, import of desktop bundles.
+  iOS/Android; Apple Vision as an iOS fallback), the same `engine` and `core` packages, a
+  native cutter module (AVFoundation / Media3 Transformer), SQLite, import of desktop bundles.
 - iOS first, then Android (wider device variance for pose performance).
 - **Exit:** record → auto-cut review → cut → skeleton → compare → rate works end to end
   on-device, including cutting a 5-minute 1080p recording without a full re-encode.
@@ -436,6 +451,6 @@ climbing-coach/
 | Handheld cameras | Camera-motion warning and stabilization; body-centric normalization keeps comparison robust |
 | Multiple climbers in frame | Tracking plus manual override |
 | Auto-cut trims away real climbing (false boundary) | Pre/post-roll padding; keyframe snapping only expands outward; originals retained so any clip can be re-cut |
-| Lossless cutting not frame-exact on all codecs/devices | Head/tail GOP re-encode fallback behind the same `cutter` interface; frame-hash verification test |
+| Lossless cutting not frame-exact on all codecs/devices | Head/tail GOP re-encode fallback behind the same `VideoTools.cut` interface; frame-hash verification test |
 | Sparse per-boulder data for ML | Stage A rule-based insights as primary value; set expectations in the UI |
 | Mobile processing cost | Offline processing after recording; per-device model size; reduced fps (15) with interpolation |
