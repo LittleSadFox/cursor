@@ -12,6 +12,8 @@ Functions:
 
 - Automatically detect when the climber starts on the wall for the boulder
 - Automatically detect when the climber falls
+- Auto-cut: use the detected start and fall to propose a cut of each attempt, let the user
+  fine-tune the start and finish, then cut the original video and store the clip in the library
 - Generate a posture skeleton view of the climber's movement
 - Generate an overlay or side-by-side comparison of two videos of the same boulder
 - Analyze and mark differences in postures
@@ -111,25 +113,86 @@ adapter boundary means swapping models later does not touch the engine.
   end-of-video.
 - **Top vs. jump-off:** both hands stationary at the attempt's highest wrist position for ≥ N
   frames before descent → top. Everything else fast → fall.
-- The **fall move index** (see 2.4) is stored with the attempt so analytics can say "falls
+- The **fall move index** (see 2.5) is stored with the attempt so analytics can say "falls
   cluster on move 4".
 - User confirms the outcome; confirmations are labels.
 
-### 2.4 Move segmentation (the unit everything else needs)
+### 2.4 Auto-cut: detect → propose → fine-tune → cut → store
+
+Auto-cut turns the raw recording (often several attempts plus walking around and resting) into
+one trimmed clip per attempt in the library. It is the main capture workflow and is built
+directly on 2.2 and 2.3.
+
+**Pipeline**
+
+1. **Detect.** Run pose extraction on the raw video, then start detection (2.2) and
+   end-of-attempt detection (2.3) to produce candidate `[start, end]` frame pairs — one per
+   attempt found in the recording.
+2. **Propose.** For each candidate, generate an *auto-cut proposal*: the detected boundaries
+   padded with a pre-roll (default 2 s before start, so the setup on the starting holds is
+   visible) and a post-roll (default 1.5 s after the fall/top, so the landing or match on the
+   finish is visible). Padding is user-configurable and clamped to the video bounds. Nothing is
+   written to disk at this stage; a proposal is just metadata referencing the original.
+3. **Fine-tune.** The review screen shows the raw video timeline with each proposal as a
+   draggable range. Per proposal the user can:
+   - drag the start and end handles with frame-step nudging (±1 frame, ±0.5 s) and a filmstrip
+     of thumbnails around each handle for precision;
+   - toggle a "skeleton" preview on the handle frame to confirm the climber is actually on the
+     wall / actually falling;
+   - split a proposal in two (detection merged two attempts), merge adjacent proposals
+     (detection split one attempt), delete a false positive, or add a range the detector
+     missed;
+   - confirm the outcome (fall / drop / top) and pick the boulder.
+4. **Cut.** On confirm, the original video is cut at the fine-tuned boundaries into one clip
+   file per attempt. The cut is lossless by default (stream copy with keyframe snapping; the
+   boundary is expanded outward to the nearest keyframe, never inward, so no climbing is
+   lost) and falls back to a re-encode of only the head and tail GOPs when exact frame
+   boundaries are required. Desktop uses `ffmpeg`; mobile uses `AVAssetExportSession` (iOS) and
+   `MediaMuxer`/`MediaCodec` (Android) behind the same interface.
+5. **Store.** Each clip becomes an `Attempt` in the library with its own `Video` record,
+   thumbnail, and a `PoseTrack` sliced from the already-computed full-video track (no
+   re-processing). The attempt stores a reference back to the original and its exact
+   `[start, end]` in original-frame coordinates so the cut is reproducible and re-adjustable.
+
+**Original video handling**
+
+- The original is kept until the user explicitly deletes it; a "keep originals" setting
+  (default: keep for 30 days, then prompt) controls storage growth.
+- Re-cut is always possible from the original as long as it exists; after deletion the clip
+  becomes the source of truth.
+
+**Corrections as training data**
+
+- Every handle adjustment is stored as a delta between the detector's proposal and the user's
+  final boundary. These deltas are the labels that train the on-wall/off-wall and
+  end-of-attempt classifiers in 2.2/2.3, and they also drive a per-user tuning of the pre-roll
+  and post-roll defaults.
+
+**Edge cases**
+
+- Recording ends mid-attempt: end handle snaps to the last frame, outcome defaults to
+  "unknown".
+- Climber walks out of frame and back: treated as an end + new start unless the gap is shorter
+  than a configurable threshold.
+- No attempt detected: the user is offered the full video as a single manual range.
+- Very long recordings (session-long, > 10 min): processing runs in the background with a
+  progress indicator; proposals appear incrementally.
+
+### 2.5 Move segmentation (the unit everything else needs)
 
 - A hand move = a wrist leaving a stationary period and settling into a new one; stationary
   periods are holds. Same for feet.
 - Attempts become sequences of moves. This gives climber-meaningful units for comparison
-  ("move 3"), fall location, and the anchors for alignment in 2.6.
+  ("move 3"), fall location, and the anchors for alignment in 2.7.
 
-### 2.5 Skeleton view
+### 2.6 Skeleton view
 
 - Render landmarks and bones on a canvas over the video (`requestVideoFrameCallback` for
   frame-accurate sync in the browser; frame-processor overlay in RN).
 - Modes: overlay on video, skeleton-only on blank background, trail view (hip path over time).
 - Export as MP4/GIF for sharing.
 
-### 2.6 Two-video comparison with pace-invariant alignment
+### 2.7 Two-video comparison with pace-invariant alignment
 
 **Spatial alignment**
 
@@ -157,16 +220,16 @@ adapter boundary means swapping models later does not touch the engine.
 section, insert a rest), run the aligner, and check it recovers the warp. This makes DTW tuning
 regression-testable without human judgment.
 
-### 2.7 Posture difference analysis
+### 2.8 Posture difference analysis
 
 - **Per aligned frame:** joint-angle deltas, hip offset from hand centroid, center of mass vs.
   the support polygon (feet/hands), limb extension. Threshold → highlight divergent joints in
   color on the overlay; a divergence-score timeline under the scrubber.
 - **Per move:** aggregated statistics ("right hip 15° more open through move 3", "hips 0.2
   torso-lengths further from hands at move 5 crux").
-- Phrased as observations, not prescriptions, until the model in 2.8 has evidence.
+- Phrased as observations, not prescriptions, until the model in 2.9 has evidence.
 
-### 2.8 Ratings and learning from progress
+### 2.9 Ratings and learning from progress
 
 Per attempt the user records: outcome (auto-detected, confirmed), fall move, 1–5 rating,
 optional structured tags (felt balanced / powerful / pumped / beta change), free notes. Stored
@@ -184,12 +247,17 @@ Learning, staged:
   technique models. Out of scope until the single-user loop proves useful.
 - The start/fall correction labels from 2.2/2.3 feed their own classifiers independently.
 
-### 2.9 Video library
+### 2.10 Video library
 
 - **Entities:** `Climber` (profile), `Gym`, `Boulder` (name, grade, color, set date, wall
-  photo), `Session`, `Video` (file ref, camera metadata), `Attempt` (video, start/end frame,
-  outcome, fall move, rating, notes), `PoseTrack`, `MoveSegment`, `Comparison` (attempt A/B,
-  warp path, metrics).
+  photo), `Session`, `Video` (file ref, camera metadata, `kind`: original | clip, and for
+  clips a reference to the original plus `[start, end]` in original-frame coordinates),
+  `CutProposal` (detected and fine-tuned boundaries, padding, correction deltas), `Attempt`
+  (clip video, outcome, fall move, rating, notes), `PoseTrack`, `MoveSegment`, `Comparison`
+  (attempt A/B, warp path, metrics).
+- **Library views:** the default library lists attempts (clips), not raw recordings; originals
+  live under a separate "Recordings" view with their derived clips listed beneath them and a
+  "re-cut" action.
 - **Storage:** SQLite for metadata (identical on desktop and mobile), files on disk for video,
   pose JSON, thumbnails. Import/export bundle (zip of DB rows + files) so desktop-processed
   data moves to the phone before sync exists.
@@ -206,8 +274,9 @@ climbing-coach/
     schema/        JSON Schema + TS types for PoseTrack, Attempt, Comparison (the contract)
     engine/        TS: smoothing, segmentation, moves, DTW alignment, metrics, insights
     pose-web/      MediaPipe Web adapter → PoseTrack
+    cutter/        Video cutting interface; ffmpeg (desktop), AVFoundation / MediaMuxer (mobile)
   apps/
-    desktop/       React + Vite local app (library, timeline, overlay, comparison, ratings)
+    desktop/       React + Vite local app (library, auto-cut review, overlay, comparison, ratings)
     mobile/        React Native / Expo (Phase 5)
   research/
     harness/       Python: labeling tool, eval scripts, model bake-off
@@ -231,17 +300,22 @@ climbing-coach/
 
 ### Phase 1 — Engine
 
-- `schema`, `engine`, `pose-web` packages; CLI that takes a video and emits PoseTrack +
-  Attempts + Moves.
+- `schema`, `engine`, `pose-web`, `cutter` packages; CLI that takes a video and emits
+  PoseTrack + cut proposals + Moves, and can apply a set of boundaries to produce clip files.
 - **Exit:** start frame within ±0.5 s on ≥ 90% of clips; fall recall ≥ 90% with top/fall
-  confusion < 10%; synthetic-warp DTW test passes.
+  confusion < 10%; synthetic-warp DTW test passes; lossless cut keeps every frame inside the
+  requested range (verified by frame-hash comparison against the original).
 
-### Phase 2 — Local standalone app
+### Phase 2 — Local standalone app (auto-cut is the core workflow)
 
-- Import video, auto-segment attempts, trim handles, skeleton overlay playback, outcome
-  confirmation, rating form, library browsing.
-- **Exit:** a user can import a session, confirm attempts, rate them, and browse by boulder
-  without touching a terminal. Package with Tauri if a double-clickable app is wanted.
+- Import a raw recording → background processing → auto-cut review screen with draggable
+  proposals, frame-step nudging, thumbnail filmstrip, split/merge/delete/add, outcome and
+  boulder selection → cut → clips appear in the library with skeleton overlay playback and a
+  rating form.
+- **Exit:** a user can import a session recording, review and fine-tune the proposed cuts,
+  produce one clip per attempt, rate them, and browse by boulder without touching a terminal.
+  Median manual adjustment per boundary on the labeled set is under 0.3 s. Package with Tauri
+  if a double-clickable app is wanted.
 
 ### Phase 3 — Comparison
 
@@ -260,10 +334,11 @@ climbing-coach/
 ### Phase 5 — Mobile
 
 - Expo app with `react-native-vision-camera` recording, native pose adapter (MediaPipe
-  iOS/Android; Apple Vision as an iOS fallback), the same `engine` package, SQLite, import of
-  desktop bundles.
+  iOS/Android; Apple Vision as an iOS fallback), the same `engine` package, native `cutter`
+  implementations (AVFoundation / MediaMuxer), SQLite, import of desktop bundles.
 - iOS first, then Android (wider device variance for pose performance).
-- **Exit:** record → detect → skeleton → compare → rate works end to end on-device.
+- **Exit:** record → auto-cut review → cut → skeleton → compare → rate works end to end
+  on-device, including cutting a 5-minute 1080p recording without a full re-encode.
 
 ### Phase 6 — Optional
 
@@ -280,5 +355,7 @@ climbing-coach/
 | Fall vs. intentional jump-off | Top-hold-dwell rule plus user confirmation; confirmations train the classifier |
 | Handheld cameras | Camera-motion warning and stabilization; body-centric normalization keeps comparison robust |
 | Multiple climbers in frame | Tracking plus manual override |
+| Auto-cut trims away real climbing (false boundary) | Pre/post-roll padding; keyframe snapping only expands outward; originals retained so any clip can be re-cut |
+| Lossless cutting not frame-exact on all codecs/devices | Head/tail GOP re-encode fallback behind the same `cutter` interface; frame-hash verification test |
 | Sparse per-boulder data for ML | Stage A rule-based insights as primary value; set expectations in the UI |
 | Mobile processing cost | Offline processing after recording; per-device model size; reduced fps (15) with interpolation |
