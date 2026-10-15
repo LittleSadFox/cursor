@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "0.0.0-empty",
+  "description": "Placeholder until P0.3 lands labeled recordings in private storage.",
+  "testSplitRatio": 0.3,
+  "recordings": []
+}

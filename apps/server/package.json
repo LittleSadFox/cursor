@@ -1,0 +1,23 @@
+{
+  "name": "@climbing-coach/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@climbing-coach/api": "workspace:*",
+    "@climbing-coach/core": "workspace:*",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "@climbing-coach/config": "workspace:*",
+    "tsx": "^4.19.3"
+  }
+}

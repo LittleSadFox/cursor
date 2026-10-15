@@ -1,0 +1,2 @@
+# Pinned when P0.5 starts. Minimal deps for the posebin round-trip today.
+pytest>=8.0
