@@ -76,6 +76,9 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 
 - **TypeScript strict** everywhere that ships. Zod for runtime validation; export JSON Schema
   from `schema` for Python.
+- **Modularity:** every function should be modular — small and single-purpose, with clear
+  inputs and outputs, composable, and independently testable. Prefer extracting helpers over
+  growing large multi-responsibility functions.
 - **Time:** media timestamps are integer microseconds (`Us`). IDs are ULIDs (generated in
   `core`, validated in `schema`).
 - **`engine`:** pure functions over typed arrays only. Ban `fs`/`path`/`process`/`window`/
