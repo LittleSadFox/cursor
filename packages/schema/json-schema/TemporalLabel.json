@@ -1,0 +1,107 @@
+{
+  "$ref": "#/definitions/TemporalLabel",
+  "definitions": {
+    "TemporalLabel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "climb_start",
+            "climb_end",
+            "outcome",
+            "exit_direction",
+            "limb_placement",
+            "boundary_correction",
+            "move_correspondence",
+            "alignment_feedback",
+            "insight_feedback"
+          ]
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "videoId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "tUs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "startUs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endUs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "fall",
+            "drop",
+            "top",
+            "unknown"
+          ]
+        },
+        "exitDirection": {
+          "type": "string",
+          "enum": [
+            "top",
+            "side",
+            "bottom",
+            "unknown"
+          ]
+        },
+        "limb": {
+          "type": "string",
+          "enum": [
+            "lh",
+            "rh",
+            "lf",
+            "rf"
+          ]
+        },
+        "otherSubjectId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "moveIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "otherMoveIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predicted": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "final": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "sourceVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "subjectId",
+        "sourceVersion"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

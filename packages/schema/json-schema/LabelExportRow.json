@@ -1,0 +1,69 @@
+{
+  "$ref": "#/definitions/LabelExportRow",
+  "definitions": {
+    "LabelExportRow": {
+      "type": "object",
+      "properties": {
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "climb_start",
+            "climb_end",
+            "outcome",
+            "exit_direction",
+            "limb_placement",
+            "boundary_correction",
+            "move_correspondence",
+            "alignment_feedback",
+            "insight_feedback"
+          ]
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "featureSpecVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "sourceVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "subjectId",
+        "kind",
+        "features",
+        "featureSpecVersion",
+        "target",
+        "sourceVersion"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

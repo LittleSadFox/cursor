@@ -5,6 +5,7 @@ export default [
   {
     ignores: [
       'packages/config/**',
+      'packages/**/scripts/**',
       'research/**',
       'datasets/**',
       'dependency-cruiser.cjs',
