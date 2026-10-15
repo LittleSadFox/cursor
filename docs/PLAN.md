@@ -46,36 +46,38 @@ alignment → comparison), not the UI. The architecture keeps that pipeline port
 │ Analysis engine (TypeScript, pure math, shared everywhere)  │
 │   segmentation · alignment (DTW) · metrics · insights       │
 ├─────────────────────────────────────────────────────────────┤
-│ Pose adapter (platform-specific, emits one JSON schema)     │
-│   Local: Python ml-worker (MediaPipe or RTMPose)            │
-│   iOS: MediaPipe iOS / Apple Vision · Android: MediaPipe    │
+│ Pose adapter (platform-specific, emits one track format)    │
+│   Same model on all platforms, runtime chosen in ADR-001:   │
+│   ONNX Runtime (preferred) or MediaPipe Tasks               │
 ├─────────────────────────────────────────────────────────────┤
-│ Storage: SQLite (metadata) + files (video, pose JSON, thumbs)│
+│ Storage: SQLite (metadata) + files (video, pose, thumbs)    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 Key decisions:
 
 - **Pose extraction is the only platform-specific layer.** Everything downstream consumes a
-  versioned `PoseTrack` JSON (per frame: timestamp, 33 landmarks with x/y/z/visibility). This
-  contract is what makes the mobile port cheap.
+  versioned `PoseTrack` (per frame: timestamp, 33 landmarks with x/y/z/visibility, stored in a
+  compact binary file). This contract is what makes the mobile port cheap.
 - **Analysis engine in TypeScript, not Python.** DTW over ~2000 frames × ~80 features is cheap
-  in JS, and TS runs unchanged on desktop (browser/Node) and mobile (Hermes). A Python notebook
-  harness is used for research and evaluation in Phase 0–1, but production algorithms land in
-  TS once validated.
+  in JS, and TS runs unchanged on desktop (browser/Node) and mobile (Hermes). Python is used
+  for research and evaluation only; nothing Python ships in the app.
 - **React → React Native.** State, hooks, timeline math, and overlay-rendering logic are shared;
   view components are rewritten for RN. Flutter (Dart engine + Flutter desktop) is the viable
   alternative; choose RN unless the team already knows Flutter.
 - **Processing is offline, after recording.** Bouldering clips are 20–90 s, so processing at
-  15–30 fps after the fact is acceptable and avoids thermal/battery problems on phones. Live
-  detection is a later optimization.
+  15–30 fps after the fact is acceptable and avoids thermal/battery problems on phones. A cheap
+  first pass finds the active parts of long recordings so the pose model only runs where
+  someone is climbing. Live detection is a later optimization.
 - **Local-first, on-device by default.** Videos of people in gyms are sensitive; no cloud
   dependency in v1.
 
-Default pose model: MediaPipe Pose Landmarker (heavy variant, offline). Climbing is a known
-weak spot for BlazePose (inverted bodies, heel hooks, occlusion by volumes, low camera angles),
-so Phase 0 includes an accuracy bake-off against RTMPose and YOLOv8-pose via ONNX Runtime. The
-adapter boundary means swapping models later does not touch the engine.
+Pose model candidates: MediaPipe Pose Landmarker and RTMPose (with feet keypoints); YOLOv8-pose
+is compared in research only because of its AGPL license. Climbing is a known weak spot for
+pose models (inverted bodies, heel hooks, occlusion by volumes, low camera angles), so Phase 0
+runs a bake-off on labeled climbing footage. The decision (ADR-001) covers both the model and
+the runtime that ships on desktop and mobile; the adapter boundary means swapping models later
+does not touch the engine.
 
 ---
 
@@ -84,8 +86,9 @@ adapter boundary means swapping models later does not touch the engine.
 ### 2.1 Pose track preprocessing (foundation for everything)
 
 - **Person selection.** Gyms have multiple people in frame. Track all detections; pick the
-  climber as the track with the most motion near the wall region, with a one-tap override in
-  the UI.
+  climber as the track with the most motion near the wall region. The review screen has a
+  "Wrong climber?" picker that shows every tracked person on the current frame; choosing one
+  re-runs detection.
 - **Smoothing.** One Euro filter per landmark; confidence gating (drop landmarks below a
   visibility threshold, interpolate short gaps).
 - **Normalization (for comparison, not detection).** Origin at mid-hip, scale by torso length
@@ -93,13 +96,18 @@ adapter boundary means swapping models later does not touch the engine.
 - **Derived features.** 8 joint angles (elbow, shoulder, hip, knee × 2 sides), trunk
   inclination, hip offset from hand centroid (2D proxy for "hips in to the wall"), per-joint
   velocities.
-- **Camera-motion check.** Track background features; if the phone is handheld and moving,
-  warn the user and apply stabilization before detection.
+- **Camera-motion check.** The first-pass activity scan also estimates global image motion
+  between frames; if the phone was handheld and moving, the recording gets a warning.
+  Stabilization is a later addition. Body-centric normalization keeps comparison usable either
+  way.
+- **Orientation.** Phone videos carry rotation metadata; all pose coordinates are stored in the
+  orientation the video is displayed in.
 
 ### 2.2 Start detection ("climber is on the wall")
 
 - **Floor estimate:** lowest ankle y during the initial standing segment (plus optional
-  mat-edge detection).
+  mat-edge detection). If the recording starts with the climber already on the wall, fall back
+  to the lowest ankle position over the whole recording, and mark the start as low confidence.
 - **Start** = first frame where both ankles are above the floor by > k × body height, hips have
   low vertical velocity for ≥ 0.5 s (established on the wall, not jumping), and both wrists
   are above shoulder height. Sit starts are handled by the ankle rule alone.
@@ -107,7 +115,8 @@ adapter boundary means swapping models later does not touch the engine.
   mat are excluded.
 - **Corrections become labels.** The UI shows the detected boundary with trim handles. Every
   manual correction is stored and later trains a per-frame on-wall/off-wall classifier
-  (windowed pose features → gradient boosting or a small 1D-CNN) that replaces the heuristics.
+  (windowed pose features → logistic regression first; gradient boosting only if it
+  measurably wins) that replaces the heuristics once it beats them.
 
 ### 2.3 Fall detection and attempt outcome
 
@@ -119,6 +128,9 @@ adapter boundary means swapping models later does not touch the engine.
   end-of-video.
 - **Top vs. jump-off:** both hands stationary at the attempt's highest wrist position for ≥ N
   frames before descent → top. Everything else fast → fall.
+- **Exit direction:** on walls that are topped out over, the climber leaves through the top of
+  the frame and the dwell rule never fires. Leaving through the top after reaching the highest
+  hand position → top; leaving through a side or the bottom → unknown, for the user to confirm.
 - The **fall move index** (see 2.5) is stored with the attempt so analytics can say "falls
   cluster on move 4".
 - User confirms the outcome; confirmations are labels.
@@ -131,34 +143,46 @@ directly on 2.2 and 2.3.
 
 **Pipeline**
 
-1. **Detect.** Run pose extraction on the raw video, then start detection (2.2) and
-   end-of-attempt detection (2.3) to produce candidate `[start, end]` frame pairs — one per
-   attempt found in the recording.
-2. **Propose.** For each candidate, generate an *auto-cut proposal*: the detected boundaries
-   padded with a pre-roll (default 2 s before start, so the setup on the starting holds is
-   visible) and a post-roll (default 1.5 s after the fall/top, so the landing or match on the
-   finish is visible). Padding is user-configurable and clamped to the video bounds. Nothing is
-   written to disk at this stage; a proposal is just metadata referencing the original.
-3. **Fine-tune.** The review screen shows the raw video timeline with each proposal as a
-   draggable range. Per proposal the user can:
-   - drag the start and end handles with frame-step nudging (±1 frame, ±0.5 s) and a filmstrip
-     of thumbnails around each handle for precision;
+1. **Detect.** A cheap first pass over keyframes finds the *active windows* of the recording
+   (where something is moving). Pose extraction runs only on those windows, then start
+   detection (2.2) and end-of-attempt detection (2.3) produce candidate climb ranges — one per
+   attempt. Proposals appear while the rest of the recording is still processing. If an
+   attempt was missed, "Process whole recording" runs pose on everything.
+2. **Propose.** Each candidate becomes a *review item*. Its two handles mark the **climb
+   range**: the first frame on the wall and the fall/top frame. Padding — a pre-roll (default
+   2 s, so the setup on the starting holds is visible) and a post-roll (default 1.5 s, so the
+   landing or match on the finish is visible) — is shown as a shaded extension and applied
+   only when cutting, clamped to the video bounds. Padding is a user setting, not something
+   the user drags. Nothing is written to disk at this stage; the review is a draft that
+   references the original.
+3. **Fine-tune.** The review screen shows the raw video timeline with each item as a
+   draggable climb range. Per item the user can:
+   - drag the start and end handles with frame-step nudging (±1 frame, ±0.5 s), a filmstrip,
+     and a pre-rendered frame strip (loupe) around each handle for precision;
    - toggle a "skeleton" preview on the handle frame to confirm the climber is actually on the
      wall / actually falling;
-   - split a proposal in two (detection merged two attempts), merge adjacent proposals
-     (detection split one attempt), delete a false positive, or add a range the detector
-     missed;
-   - confirm the outcome (fall / drop / top) and pick the boulder.
-4. **Cut.** On confirm, the original video is cut at the fine-tuned boundaries into one clip
-   file per attempt. The cut is lossless by default (stream copy with keyframe snapping; the
-   boundary is expanded outward to the nearest keyframe, never inward, so no climbing is
-   lost) and falls back to a re-encode of only the head and tail GOPs when exact frame
-   boundaries are required. Desktop uses `ffmpeg`; mobile uses AVFoundation (iOS) and Media3
-   Transformer (Android) behind the same interface.
+   - split an item in two (detection merged two attempts), merge adjacent items (detection
+     split one attempt), reject a false positive, or add a range the detector missed;
+   - confirm the outcome (fall / drop / top), pick the boulder (the previous item's boulder is
+     the default, and a new boulder can be created inline), and optionally enter the two
+     scores from 2.9 while the attempt is fresh.
+
+   Every edit can be undone and redone, and the draft is saved automatically. Climb ranges may
+   not overlap; padded clips may share frames. If detection is updated while the user is
+   reviewing (more of the recording processed, or a different climber chosen with the track
+   picker from 2.1), new items are merged in, and items the user has edited are never changed.
+4. **Cut.** On commit, the original video is cut into one clip file per attempt (climb range
+   plus padding). The default cut is lossless: stream copy, with the boundaries expanded
+   outward to the nearest keyframe, never inward, so no climbing is lost. When a camera's long
+   keyframe interval would expand a clip by more than 2 s, the clip is re-encoded instead
+   (hardware encoder where available). Desktop uses `ffmpeg`; mobile uses AVFoundation (iOS)
+   and Media3 Transformer (Android) behind the same interface.
 5. **Store.** Each clip becomes an `Attempt` in the library with its own `Video` record,
-   thumbnail, and a `PoseTrack` sliced from the already-computed full-video track (no
-   re-processing). The attempt stores a reference back to the original and its exact
-   `[start, end]` in original-frame coordinates so the cut is reproducible and re-adjustable.
+   thumbnail, and a `PoseTrack` sliced from the already-computed track (no re-processing); a
+   higher-frame-rate pose track is computed in the background afterwards. The attempt stores
+   its climb range in clip time — moves, comparisons, and alignment use only that range —
+   plus a reference to the original and the clip's position in it, so the cut is
+   reproducible and re-adjustable.
 
 **Original video handling**
 
@@ -169,10 +193,13 @@ directly on 2.2 and 2.3.
 
 **Corrections as training data**
 
-- Every handle adjustment is stored as a delta between the detector's proposal and the user's
-  final boundary. These deltas are the labels that train the on-wall/off-wall and
-  end-of-attempt classifiers in 2.2/2.3, and they also drive a per-user tuning of the pre-roll
-  and post-roll defaults.
+- At commit, the detector's climb ranges are compared with the user's final climb ranges.
+  Padding is not part of either, so the labels measure detector error only: start and end
+  deltas, rejected items (false positives), added items (false negatives), and merges and
+  splits. These labels train the on-wall/off-wall and end-of-attempt classifiers in 2.2/2.3.
+- If a user's corrections are consistently in one direction (at least 20 labels, at least 70%
+  with the same sign), the detector applies a per-user boundary offset, bounded to ±1 s and
+  visible in the detector health view. Padding is never tuned automatically.
 
 **Edge cases**
 
@@ -181,8 +208,11 @@ directly on 2.2 and 2.3.
 - Climber walks out of frame and back: treated as an end + new start unless the gap is shorter
   than a configurable threshold.
 - No attempt detected: the user is offered the full video as a single manual range.
-- Very long recordings (session-long, > 10 min): processing runs in the background with a
-  progress indicator; proposals appear incrementally.
+- Very long recordings (session-long, > 10 min): the activity pass keeps pose extraction to
+  the active windows; processing runs in the background with a progress indicator, and
+  proposals appear incrementally.
+- Wrong person detected (several climbers in frame): the track picker re-runs detection on the
+  chosen climber; items already edited are kept.
 
 ### 2.5 Move segmentation (the unit everything else needs)
 
@@ -194,7 +224,10 @@ directly on 2.2 and 2.3.
 ### 2.6 Skeleton view
 
 - Render landmarks and bones on a canvas over the video (`requestVideoFrameCallback` for
-  frame-accurate sync in the browser; frame-processor overlay in RN).
+  frame-accurate sync in the browser; a Skia canvas over the video player on mobile). Both
+  draw from the same platform-independent draw commands.
+- Playback uses an H.264 SDR proxy of each clip when the original is HEVC, HDR, or above 1080p,
+  so every platform can play it smoothly.
 - Modes: overlay on video, skeleton-only on blank background, trail view (hip path over time).
 - Export as MP4/GIF for sharing.
 
@@ -237,8 +270,8 @@ regression-testable without human judgment.
 
 ### 2.9 Ratings and learning from progress
 
-Each attempt carries two independent scores, entered right after the cut is confirmed (and
-editable later from the library):
+Each attempt carries two independent scores, entered during auto-cut review or right after the
+cut is committed (and editable later from the library):
 
 1. **Proximity to success** (1–5): how close the attempt felt to a send, regardless of the
    recorded outcome. Anchors shown in the UI: 1 "couldn't do the move", 2 "touched the next
@@ -265,11 +298,15 @@ Learning, staged:
   failed attempts and surface the features that differ most at the fall move. Also flag
   attempts with high exertion and low proximity as candidates for a beta change rather than
   "try harder".
-- **Stage B — small-data ML.** Per-move feature vectors → logistic regression / gradient
-  boosting with per-feature contributions (SHAP) predicting outcome, proximity, and exertion.
-  Exertion as a target is what lets the model separate "efficient movement" from "powering
-  through". Per-boulder data is sparse, so models train across the user's boulders on
-  normalized features, with per-boulder deltas shown for interpretation.
+- **Stage B — small-data ML.** Per-move feature vectors → L2-regularized logistic regression,
+  trained on-device in TypeScript (desktop and mobile alike, no Python), with per-feature
+  contributions, predicting outcome, proximity, and exertion. Gradient boosting with SHAP
+  values is tried in research and adopted only if it beats logistic regression by a clear
+  margin. Exertion as a target is what lets the model separate "efficient movement" from
+  "powering through". Per-boulder data is sparse, so models train across the user's boulders
+  on normalized features, with per-boulder deltas shown for interpretation. New models run in
+  shadow mode first and are promoted only if they beat the active model, with automatic
+  rollback.
 - **Stage C — optional, opt-in.** Aggregated anonymized pose data across users for general
   technique models. Out of scope until the single-user loop proves useful.
 - The start/fall correction labels from 2.2/2.3 feed their own classifiers independently.
@@ -277,18 +314,28 @@ Learning, staged:
 ### 2.10 Video library
 
 - **Entities:** `Climber` (profile), `Gym`, `Boulder` (name, grade, color, set date, wall
-  photo), `Session`, `Video` (file ref, camera metadata, `kind`: original | clip, and for
-  clips a reference to the original plus `[start, end]` in original-frame coordinates),
-  `CutProposal` (detected and fine-tuned boundaries, padding, correction deltas), `Attempt`
-  (clip video, outcome, fall move, proximity score, exertion score, tags, notes),
-  `PoseTrack`, `MoveSegment`, `Comparison` (attempt A/B, warp path, metrics),
-  `TrainingLog` (see 2.11).
+  photo), `Session`, `Video` (file ref, camera metadata, `kind`: original or clip,
+  discipline: boulder or route, review state, and for clips a reference to the original plus
+  the clip's position in it), `ReviewItem` (detected and final climb range, padding, outcome,
+  boulder, scores, whether the user edited it), `Attempt` (clip video, climb range in clip
+  time, outcome, fall move, proximity score, exertion score, tags, notes), `PoseTrack`,
+  `MoveSegment`, `Comparison` (attempt A/B, warp path, metrics), `TrainingLog` (see 2.11).
 - **Library views:** the default library lists attempts (clips), not raw recordings; originals
-  live under a separate "Recordings" view with their derived clips listed beneath them and a
-  "re-cut" action.
+  live under a separate "Recordings" view with their review state (unreviewed / in review /
+  done) and warnings, their derived clips listed beneath them, and a "re-cut" action.
+- **Getting videos in:** on desktop, import files or a folder; on mobile, record in the app or
+  import from Photos (including videos offloaded to iCloud).
+- **Deleting:** deleting anything moves it to a trash, restorable for 30 days. Purging an
+  original keeps its clips and attempts; purging an attempt keeps its correction labels, so
+  training data is not lost.
 - **Storage:** SQLite for metadata (identical on desktop and mobile), files on disk for video,
-  pose JSON, thumbnails. Import/export bundle (zip of DB rows + files) so desktop-processed
-  data moves to the phone before sync exists.
+  playback proxies, pose tracks (compact binary), thumbnails. Every row carries created,
+  updated, and deleted timestamps so sync can be added later without a schema rewrite. The
+  database is backed up daily and before every migration.
+- **Bundles:** export/import as a zip with a manifest and file hashes — all rows in scope
+  (attempts, ratings, logs, labels, insight feedback, settings, models) plus clips, proxies,
+  pose tracks, and optionally originals. Bundles move desktop-processed data to the phone
+  before sync exists and double as a backup.
 - **Browsing:** filters by boulder, grade, outcome, date range, proximity, exertion. Boulder
   page shows attempt history and the proximity-vs-exertion chart.
 
@@ -299,8 +346,13 @@ The homepage is a training diary, not the video library. It opens on today and t
 
 **Daily entry (`TrainingLog`, one row per day, editable all day)**
 
-- **Session exertion** (1–10, same CR10 scale as per-attempt exertion). Pre-filled with the
-  mean of today's attempt exertion scores when video attempts exist; the user can override.
+- **Session exertion** (1–10, same CR10 scale as per-attempt exertion). When rated attempts
+  exist, it is pre-filled with round(0.5 × max + 0.5 × mean) of that day's attempt exertion
+  scores, because the mean alone underestimates a session's effort. The basis ("12 attempts,
+  mean 6.4, max 9") is shown next to the field, and the user can override it.
+- **Which day:** attempts belong to the day of their session (confirmed at import, defaulting
+  to the video's creation time), in the climber's local time; a session that crosses
+  midnight belongs to the day it started.
 - **Volume:** number of boulders and/or routes climbed (two separate counters), with optional
   grade breakdown (e.g. 3 × V3, 2 × V5). Pre-filled from today's logged attempts (distinct
   boulders) and adjustable, since not every climb is filmed.
@@ -319,10 +371,12 @@ The homepage is a training diary, not the video library. It opens on today and t
 All charts share one time-range selector (1 week / 4 weeks / 3 months / 1 year / all) and are
 labeled with axis units.
 
-- **Training load over time:** daily load bars with a 7-day rolling average line and a 28-day
-  rolling average line. The ratio between them (acute:chronic workload ratio) is shown as a
-  small indicator with "ramping fast" / "steady" / "detraining" bands — the one number that
-  tells a climber whether they are overdoing it.
+- **Training load over time:** daily load bars with a 7-day and a 28-day average line (rolling
+  averages by default, exponentially weighted as an option). The ratio between them
+  (acute:chronic workload ratio) is shown as a small indicator with "ramping fast" / "steady" /
+  "detraining" bands — the one number that tells a climber whether they are overdoing it. The
+  bands come from team-sport research, so they are presented as guidance with an explanation,
+  not as medical advice.
 - **Exertion vs. volume:** per-day points (volume on x, exertion on y) — the same "up and left
   is better" reading as the per-attempt chart, at session scale.
 - **Training focus distribution:** stacked bars per week showing how sessions split across
@@ -355,23 +409,24 @@ The full module layout, dependency rules, and API are in [`BUILD_PLAN.md`](./BUI
 climbing-coach/
   apps/
     desktop/       Electron shell
-    web/           React + Vite UI (home/training log, library, auto-cut review, overlay, comparison, ratings)
+    web/           React + Vite UI (home/training log, library, auto-cut review, overlay,
+                   comparison, ratings); overlay rendering and hooks live here until mobile
     server/        Local Fastify API server
     cli/           `coach` CLI for processing, cutting, eval
-    mobile/        React Native / Expo (Phase 5)
+    mobile/        React Native / Expo (Phase 5), with native frame, pose, and cutter modules
   packages/
     schema/        Domain types, PoseTrack / posebin format, label formats (the contract)
-    engine/        TS: smoothing, detection, cut proposals, moves, DTW alignment, comparison, stats, insights
+    engine/        TS: activity pass, smoothing, detection, review drafts, moves, DTW alignment,
+                   comparison, stats, insights, logistic regression
     api/           API contract, `CoachApi` interface, HTTP client, conformance tests
-    core/          Application services and ports
-    db/            SQLite schema and migrations (Drizzle)
-    adapters-node/ ffmpeg video tools, ml-worker client, file store (desktop)
-    adapters-native/ Native pose and cutter modules, expo-sqlite (mobile)
-    render/  app-hooks/  ui-web/  test-fixtures/  config/
-  workers/
-    ml-worker/     Python: pose extraction and model training
+    core/          Application services, ports, job pipelines, SQLite schema (Drizzle)
+    adapters-node/ ffmpeg video tools, pose runtime, file store (desktop)
+    adapters-native/ expo-sqlite, file store, native module bindings (mobile)
+    test-fixtures/  config/
   research/
-    label-tool/  harness/  notebooks/
+    pose-lab/      Python, research only: pose model bake-off and model export
+    label-tool/  training/  notebooks/
+  datasets/        Manifest and labels (media in private storage)
   docs/
 ```
 
@@ -381,36 +436,43 @@ climbing-coach/
 
 ### Phase 0 — Ground truth and model bake-off
 
-- Collect 30–50 clips of real attempts across angles, lighting, and wall types (slab, vert,
-  overhang, roof).
-- Hand-label start frame, end frame, outcome, and move boundaries for each clip (simple
-  labeling tool in `research/harness`).
-- Run pose models on the set; measure landmark stability on inverted/occluded frames.
-- **Exit:** chosen pose model; evaluation script that scores start/fall detection and
-  alignment on the labeled set.
+- Collect 30–50 recordings (at least 120 attempts) across angles, lighting, and wall types
+  (slab, vert, overhang, roof), following a capture protocol (camera placement, H.264, HDR
+  off), plus a few HEVC/HDR and handheld recordings as robustness cases.
+- Hand-label climb start, climb end, outcome, exit direction, and move boundaries for each
+  attempt (simple labeling tool in `research/label-tool`); freeze a test split.
+- Run pose models on the set; measure landmark stability on inverted/occluded frames. Test
+  each candidate in the runtime it would ship in (ONNX Runtime or MediaPipe Tasks) on desktop
+  and phones.
+- Build LGPL ffmpeg for each desktop platform and record the licensing decision (ADR-002).
+- **Exit:** chosen pose model and runtime (ADR-001); evaluation script that scores start/fall
+  detection and alignment on the labeled set, with confidence intervals.
 
 ### Phase 1 — Engine
 
-- `schema` and `engine` packages, the `ml-worker` pose sidecar, and the ffmpeg video tools in
-  `adapters-node`; `coach` CLI that takes a video and emits PoseTrack + cut proposals + Moves,
-  and can apply a set of boundaries to produce clip files.
-- **Exit:** start frame within ±0.5 s on ≥ 90% of clips; fall recall ≥ 90% with top/fall
-  confusion < 10%; synthetic-warp DTW test passes; lossless cut keeps every frame inside the
-  requested range (verified by frame-hash comparison against the original).
+- `schema` and `engine` packages (activity pass, detection, review drafts, moves, alignment),
+  the pose adapter for the ADR-001 runtime, and the ffmpeg video tools in `adapters-node`
+  (probing, proxies, lossless and re-encode cuts); `coach` CLI that takes a video and emits
+  PoseTrack + review items + Moves, and can apply a set of climb ranges to produce clip files.
+- **Exit:** the activity pass keeps at least 99% of attempts inside its active windows; start
+  frame within ±0.5 s on ≥ 90% of attempts; fall recall ≥ 90% with top/fall confusion < 10%;
+  synthetic-warp DTW test passes; lossless cut keeps every frame inside the requested range
+  (verified by frame-hash comparison against the original).
 
 ### Phase 2 — Local standalone app (auto-cut is the core workflow)
 
 - Import a raw recording → background processing → auto-cut review screen with draggable
-  proposals, frame-step nudging, thumbnail filmstrip, split/merge/delete/add, outcome and
-  boulder selection → cut → clips appear in the library with skeleton overlay playback and the
-  two-score rating form (proximity to success, exertion).
+  climb ranges, shaded padding, frame-step nudging, filmstrip and loupe, split/merge/reject/add,
+  undo/redo, track picker, outcome, boulder selection, and optional scores → cut → clips
+  appear in the library with skeleton overlay playback and the two-score rating form
+  (proximity to success, exertion). Trash and bundle export/import are included.
 - Homepage with the daily training log entry (session exertion, boulder/route counts, focus,
   session type, duration) pre-filled from the day's attempts, plus the training-load,
   exertion-vs-volume, focus-distribution, and grade-pyramid charts.
 - **Exit:** a user can import a session recording, review and fine-tune the proposed cuts,
   produce one clip per attempt, rate them, log the day, and see the day on the homepage
-  charts without touching a terminal. Median manual adjustment per boundary on the labeled
-  set is under 0.3 s. Packaged as an Electron desktop app.
+  charts without touching a terminal. Over at least 5 real gym sessions, the median climb
+  boundary adjustment is under 0.3 s. Packaged as a signed Electron desktop app.
 
 ### Phase 3 — Comparison
 
@@ -421,19 +483,27 @@ climbing-coach/
 
 ### Phase 4 — Insights and learning loop
 
+- Grow the labeled dataset to at least 300 attempts (dataset v2) — the first test split is
+  too small to decide whether a model beats the heuristics.
 - Rule-based sent-vs-failed insights; dataset export; train start/fall classifiers on
-  accumulated corrections; first outcome/proximity/exertion model once enough attempts exist.
-- **Exit:** classifier beats heuristics on the labeled set; insights panel ships behind a clear
-  "based on N attempts" caveat.
+  accumulated corrections with logistic regression in TypeScript; first
+  outcome/proximity/exertion model once enough attempts exist; shadow-mode promotion with
+  rollback; per-user boundary offset.
+- **Exit:** classifier beats heuristics on dataset v2, with confidence intervals; insights
+  panel ships behind a clear "based on N attempts" caveat.
 
 ### Phase 5 — Mobile
 
-- Expo app with `react-native-vision-camera` recording, native pose adapter (MediaPipe
-  iOS/Android; Apple Vision as an iOS fallback), the same `engine` and `core` packages, a
-  native cutter module (AVFoundation / Media3 Transformer), SQLite, import of desktop bundles.
+- Spikes first: pose throughput, lossless trimming, and engine compute off the UI thread on
+  reference phones (ADR-003).
+- Expo app with `react-native-vision-camera` recording (H.264, HDR off by default), import
+  from Photos, a native pose module running the same model and runtime chosen in ADR-001, the
+  same `engine` and `core` packages, a native cutter module (AVFoundation / Media3
+  Transformer), SQLite, Skia overlays, import of desktop bundles.
 - iOS first, then Android (wider device variance for pose performance).
-- **Exit:** record → auto-cut review → cut → skeleton → compare → rate works end to end
-  on-device, including cutting a 5-minute 1080p recording without a full re-encode.
+- **Exit:** record or import → auto-cut review → cut → skeleton → compare → rate works end to
+  end on-device, including cutting a 5-minute 1080p recording without a full re-encode; pose
+  output matches desktop within tolerance.
 
 ### Phase 6 — Optional
 
@@ -447,10 +517,13 @@ climbing-coach/
 | Risk | Mitigation |
 | --- | --- |
 | Pose quality on climbing-specific postures | Phase 0 bake-off; adapter boundary allows swapping models |
+| No accurate pose model runs in a shippable runtime on every platform | ADR-001 tests model and runtime together; MediaPipe Tasks as the alternative to ONNX Runtime |
 | Fall vs. intentional jump-off | Top-hold-dwell rule plus user confirmation; confirmations train the classifier |
 | Handheld cameras | Camera-motion warning and stabilization; body-centric normalization keeps comparison robust |
-| Multiple climbers in frame | Tracking plus manual override |
-| Auto-cut trims away real climbing (false boundary) | Pre/post-roll padding; keyframe snapping only expands outward; originals retained so any clip can be re-cut |
-| Lossless cutting not frame-exact on all codecs/devices | Head/tail GOP re-encode fallback behind the same `VideoTools.cut` interface; frame-hash verification test |
+| Multiple climbers in frame | Tracking plus the "Wrong climber?" track picker |
+| Auto-cut trims away real climbing (false boundary) | Padding added around the climb range at cut time; keyframe snapping only expands outward; originals retained so any clip can be re-cut |
+| Activity pass misses an attempt | Active windows padded ± 3 s; recall ≥ 99% as a Phase 1 gate; "Process whole recording" fallback |
+| Long keyframe intervals make lossless cuts much longer than requested | `auto` cut mode re-encodes the clip (hardware encoder) when expansion exceeds 2 s; frame-hash verification test |
+| HDR / HEVC phone footage is slow to process and play | Capture defaults to H.264 SDR; tone-mapping at proxy size; all playback through H.264 proxies |
 | Sparse per-boulder data for ML | Stage A rule-based insights as primary value; set expectations in the UI |
 | Mobile processing cost | Offline processing after recording; per-device model size; reduced fps (15) with interpolation |
