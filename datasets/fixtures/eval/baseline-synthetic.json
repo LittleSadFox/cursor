@@ -1,0 +1,36 @@
+{
+  "name": "baseline-synthetic-v0",
+  "detectorVersion": "heuristic-stub@0.0.0",
+  "toleranceUs": 500000,
+  "cases": [
+    {
+      "id": "stand-climb-fall",
+      "labeled": [{ "startUs": 2000000, "endUs": 8000000 }],
+      "predicted": [{ "startUs": 2100000, "endUs": 8050000 }]
+    },
+    {
+      "id": "two-attempts",
+      "labeled": [
+        { "startUs": 1000000, "endUs": 4000000 },
+        { "startUs": 7000000, "endUs": 11000000 }
+      ],
+      "predicted": [
+        { "startUs": 1200000, "endUs": 4100000 },
+        { "startUs": 6900000, "endUs": 11200000 }
+      ]
+    },
+    {
+      "id": "missed-attempt",
+      "labeled": [
+        { "startUs": 1000000, "endUs": 3000000 },
+        { "startUs": 5000000, "endUs": 7000000 }
+      ],
+      "predicted": [{ "startUs": 1050000, "endUs": 2950000 }]
+    },
+    {
+      "id": "late-start",
+      "labeled": [{ "startUs": 3000000, "endUs": 9000000 }],
+      "predicted": [{ "startUs": 4000000, "endUs": 9100000 }]
+    }
+  ]
+}
