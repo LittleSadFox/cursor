@@ -18,8 +18,11 @@ Functions:
 - Generate an overlay or side-by-side comparison of two videos of the same boulder
 - Analyze and mark differences in postures
 - Handle different pacing between attempts (e.g. resting longer on a hold); match movement, not time
-- Let the user rate each attempt so that, combined with the skeleton data, ML can learn what drove progress
+- Let the user rate each attempt with two scores — proximity to success and exertion — so
+  that, combined with the skeleton data, ML can learn what drove progress
 - Video library where the user stores videos
+- Homepage where the user records today's training effort (exertion, number of boulders or
+  routes, training focus such as capacity / strength / endurance) with a graph view over time
 
 Platform: standalone app on a local environment first, then iOS and Android.
 
@@ -231,18 +234,39 @@ regression-testable without human judgment.
 
 ### 2.9 Ratings and learning from progress
 
-Per attempt the user records: outcome (auto-detected, confirmed), fall move, 1–5 rating,
-optional structured tags (felt balanced / powerful / pumped / beta change), free notes. Stored
-alongside the pose track, moves, and derived metrics.
+Each attempt carries two independent scores, entered right after the cut is confirmed (and
+editable later from the library):
+
+1. **Proximity to success** (1–5): how close the attempt felt to a send, regardless of the
+   recorded outcome. Anchors shown in the UI: 1 "couldn't do the move", 2 "touched the next
+   hold", 3 "held it but couldn't move on", 4 "one move / one slip from the top", 5 "sent, or
+   would have with a clean repeat". For a sent attempt the score shifts to quality of the send
+   (5 = smooth, 3 = barely held on). Kept separate from the auto-detected outcome because
+   "fell at the last move feeling solid" and "fell at the last move completely out of control"
+   are different data points.
+2. **Exertion** (1–10, Borg CR10 style): how much effort the attempt took. Anchors: 1 "warm-up
+   easy", 3 "moderate", 5 "hard", 7 "very hard", 10 "absolute limit". Captured per attempt so
+   fatigue within a session is visible (same boulder, rising exertion, falling proximity).
+
+Also stored per attempt: outcome (auto-detected, confirmed), fall move, optional structured
+tags (felt balanced / powerful / pumped / beta change), free notes. Everything sits alongside
+the pose track, moves, and derived metrics.
+
+The two scores are plotted against each other on the boulder page (proximity on y, exertion on
+x, one point per attempt, colored by session): progress shows as points moving up and left —
+closer to the send for less effort.
 
 Learning, staged:
 
 - **Stage A — rule-based (works from the first session).** Within one boulder, compare sent vs.
-  failed attempts and surface the features that differ most at the fall move.
+  failed attempts and surface the features that differ most at the fall move. Also flag
+  attempts with high exertion and low proximity as candidates for a beta change rather than
+  "try harder".
 - **Stage B — small-data ML.** Per-move feature vectors → logistic regression / gradient
-  boosting with per-feature contributions (SHAP) predicting outcome and rating. Per-boulder
-  data is sparse, so models train across the user's boulders on normalized features, with
-  per-boulder deltas shown for interpretation.
+  boosting with per-feature contributions (SHAP) predicting outcome, proximity, and exertion.
+  Exertion as a target is what lets the model separate "efficient movement" from "powering
+  through". Per-boulder data is sparse, so models train across the user's boulders on
+  normalized features, with per-boulder deltas shown for interpretation.
 - **Stage C — optional, opt-in.** Aggregated anonymized pose data across users for general
   technique models. Out of scope until the single-user loop proves useful.
 - The start/fall correction labels from 2.2/2.3 feed their own classifiers independently.
@@ -253,16 +277,69 @@ Learning, staged:
   photo), `Session`, `Video` (file ref, camera metadata, `kind`: original | clip, and for
   clips a reference to the original plus `[start, end]` in original-frame coordinates),
   `CutProposal` (detected and fine-tuned boundaries, padding, correction deltas), `Attempt`
-  (clip video, outcome, fall move, rating, notes), `PoseTrack`, `MoveSegment`, `Comparison`
-  (attempt A/B, warp path, metrics).
+  (clip video, outcome, fall move, proximity score, exertion score, tags, notes),
+  `PoseTrack`, `MoveSegment`, `Comparison` (attempt A/B, warp path, metrics),
+  `TrainingLog` (see 2.11).
 - **Library views:** the default library lists attempts (clips), not raw recordings; originals
   live under a separate "Recordings" view with their derived clips listed beneath them and a
   "re-cut" action.
 - **Storage:** SQLite for metadata (identical on desktop and mobile), files on disk for video,
   pose JSON, thumbnails. Import/export bundle (zip of DB rows + files) so desktop-processed
   data moves to the phone before sync exists.
-- **Browsing:** filters by boulder, grade, outcome, date range, rating. Boulder page shows
-  attempt history and progress charts.
+- **Browsing:** filters by boulder, grade, outcome, date range, proximity, exertion. Boulder
+  page shows attempt history and the proximity-vs-exertion chart.
+
+### 2.11 Homepage: daily training log and graphs
+
+The homepage is a training diary, not the video library. It opens on today and takes under
+30 seconds to fill in.
+
+**Daily entry (`TrainingLog`, one row per day, editable all day)**
+
+- **Session exertion** (1–10, same CR10 scale as per-attempt exertion). Pre-filled with the
+  mean of today's attempt exertion scores when video attempts exist; the user can override.
+- **Volume:** number of boulders and/or routes climbed (two separate counters), with optional
+  grade breakdown (e.g. 3 × V3, 2 × V5). Pre-filled from today's logged attempts (distinct
+  boulders) and adjustable, since not every climb is filmed.
+- **Training focus** (multi-select, with one marked primary): capacity, strength, power,
+  endurance, power-endurance, technique, projecting, flexibility/mobility, rest/active
+  recovery. Users can add custom focus tags.
+- **Session type:** climbing, board (Kilter/Moon/Tension), hangboard, gym/weights, cardio,
+  rest.
+- **Duration** (minutes), optional.
+- **Body state:** finger/skin/joint flags and a free-text note, optional.
+- **Derived, not entered:** training load = session exertion × duration (session-RPE method),
+  which becomes the basis of the load graphs below.
+
+**Graph view**
+
+All charts share one time-range selector (1 week / 4 weeks / 3 months / 1 year / all) and are
+labeled with axis units.
+
+- **Training load over time:** daily load bars with a 7-day rolling average line and a 28-day
+  rolling average line. The ratio between them (acute:chronic workload ratio) is shown as a
+  small indicator with "ramping fast" / "steady" / "detraining" bands — the one number that
+  tells a climber whether they are overdoing it.
+- **Exertion vs. volume:** per-day points (volume on x, exertion on y) — the same "up and left
+  is better" reading as the per-attempt chart, at session scale.
+- **Training focus distribution:** stacked bars per week showing how sessions split across
+  focus categories, to catch "I only ever project" patterns.
+- **Grade pyramid:** count of sends per grade over the selected range, boulders and routes
+  separately.
+- **Weekly summary strip:** sessions, total load, hardest send, days since last rest day.
+
+**Linking to the video library**
+
+- Days with filmed attempts show a thumbnail strip under the entry; tapping opens that
+  session's clips.
+- Attempt-level proximity and exertion feed the daily entry's pre-fill and give the
+  insights model (2.9) a fatigue context: the same boulder attempted at session load 300 vs.
+  800 is not the same attempt.
+- Streak and rest-day logic: a day with no entry is "no entry", not "rest"; rest days are
+  logged explicitly so the load charts stay honest.
+
+**Reminders (mobile only):** optional end-of-day prompt to fill in the entry if an attempt was
+recorded but no log exists.
 
 ---
 
@@ -276,7 +353,7 @@ climbing-coach/
     pose-web/      MediaPipe Web adapter → PoseTrack
     cutter/        Video cutting interface; ffmpeg (desktop), AVFoundation / MediaMuxer (mobile)
   apps/
-    desktop/       React + Vite local app (library, auto-cut review, overlay, comparison, ratings)
+    desktop/       React + Vite local app (home/training log, library, auto-cut review, overlay, comparison, ratings)
     mobile/        React Native / Expo (Phase 5)
   research/
     harness/       Python: labeling tool, eval scripts, model bake-off
@@ -310,12 +387,15 @@ climbing-coach/
 
 - Import a raw recording → background processing → auto-cut review screen with draggable
   proposals, frame-step nudging, thumbnail filmstrip, split/merge/delete/add, outcome and
-  boulder selection → cut → clips appear in the library with skeleton overlay playback and a
-  rating form.
+  boulder selection → cut → clips appear in the library with skeleton overlay playback and the
+  two-score rating form (proximity to success, exertion).
+- Homepage with the daily training log entry (session exertion, boulder/route counts, focus,
+  session type, duration) pre-filled from the day's attempts, plus the training-load,
+  exertion-vs-volume, focus-distribution, and grade-pyramid charts.
 - **Exit:** a user can import a session recording, review and fine-tune the proposed cuts,
-  produce one clip per attempt, rate them, and browse by boulder without touching a terminal.
-  Median manual adjustment per boundary on the labeled set is under 0.3 s. Package with Tauri
-  if a double-clickable app is wanted.
+  produce one clip per attempt, rate them, log the day, and see the day on the homepage
+  charts without touching a terminal. Median manual adjustment per boundary on the labeled
+  set is under 0.3 s. Package with Tauri if a double-clickable app is wanted.
 
 ### Phase 3 — Comparison
 
@@ -327,7 +407,7 @@ climbing-coach/
 ### Phase 4 — Insights and learning loop
 
 - Rule-based sent-vs-failed insights; dataset export; train start/fall classifiers on
-  accumulated corrections; first outcome/rating model once enough attempts exist.
+  accumulated corrections; first outcome/proximity/exertion model once enough attempts exist.
 - **Exit:** classifier beats heuristics on the labeled set; insights panel ships behind a clear
   "based on N attempts" caveat.
 
