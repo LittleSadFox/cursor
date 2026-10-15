@@ -3,8 +3,8 @@
 ## Goal
 
 Build an app that lets climbers record bouldering videos, document their attempts, and
-analyze their movement over time. The app starts as a standalone local (desktop) application
-and then moves to iOS and Android.
+analyze their movement over time. The app starts as a standalone local desktop application
+for macOS and then moves to iOS and Android.
 
 This is the product plan. The engineering plan (stack, modules, API, architecture, phases,
 test criteria, feedback loops) is in [`BUILD_PLAN.md`](./BUILD_PLAN.md).
@@ -27,7 +27,9 @@ Functions:
 - Homepage where the user records today's training effort (exertion, number of boulders or
   routes, training focus such as capacity / strength / endurance) with a graph view over time
 
-Platform: standalone app on a local environment first, then iOS and Android.
+Platform: standalone app on a local environment first — a macOS desktop app (macOS 13 Ventura
+or later, Apple Silicon) — then iOS and Android. Windows, Linux, and Intel Macs are out of scope
+for v1.
 
 ---
 
@@ -40,7 +42,7 @@ alignment → comparison), not the UI. The architecture keeps that pipeline port
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ UI shell                                                    │
-│   Local: React web app (Vite) → packaged with Electron      │
+│   Local: React web app (Vite) → Electron app for macOS      │
 │   Mobile: React Native / Expo (iOS + Android)               │
 ├─────────────────────────────────────────────────────────────┤
 │ Analysis engine (TypeScript, pure math, shared everywhere)  │
@@ -71,6 +73,12 @@ Key decisions:
   someone is climbing. Live detection is a later optimization.
 - **Local-first, on-device by default.** Videos of people in gyms are sensitive; no cloud
   dependency in v1.
+- **macOS first on the desktop.** Most users film on an iPhone, and the videos reach the Mac
+  through iCloud Photos, so the desktop app imports straight from Photos. Targeting one OS on
+  Apple Silicon means one ffmpeg build with Apple's hardware video codecs (VideoToolbox), HEVC
+  and HDR iPhone footage that plays natively, and the same CoreML acceleration for the pose
+  model on the Mac and the iPhone. The stack (Electron, TypeScript, ffmpeg) stays
+  cross-platform, so Windows or Linux later is packaging work, not a rewrite.
 
 Pose model candidates: MediaPipe Pose Landmarker and RTMPose (with feet keypoints); YOLOv8-pose
 is compared in research only because of its AGPL license. Climbing is a known weak spot for
@@ -226,8 +234,9 @@ directly on 2.2 and 2.3.
 - Render landmarks and bones on a canvas over the video (`requestVideoFrameCallback` for
   frame-accurate sync in the browser; a Skia canvas over the video player on mobile). Both
   draw from the same platform-independent draw commands.
-- Playback uses an H.264 SDR proxy of each clip when the original is HEVC, HDR, or above 1080p,
-  so every platform can play it smoothly.
+- HEVC clips from an iPhone play directly on the Mac. Clips that are HDR or above 1080p get an
+  H.264 SDR playback proxy, so overlays and side-by-side comparisons look consistent and play
+  smoothly.
 - Modes: overlay on video, skeleton-only on blank background, trail view (hip path over time).
 - Export as MP4/GIF for sharing.
 
@@ -323,8 +332,13 @@ Learning, staged:
 - **Library views:** the default library lists attempts (clips), not raw recordings; originals
   live under a separate "Recordings" view with their review state (unreviewed / in review /
   done) and warnings, their derived clips listed beneath them, and a "re-cut" action.
-- **Getting videos in:** on desktop, import files or a folder; on mobile, record in the app or
-  import from Photos (including videos offloaded to iCloud).
+- **Getting videos in:** on the Mac, import from Photos (including videos that are only in
+  iCloud, with download progress) or drag files and folders in from Finder; on mobile, record
+  in the app or import from Photos. The video's creation date proposes the session.
+- **Library location (Mac):** defaults to a folder in Movies; folders synced by iCloud Drive or
+  Dropbox are refused, because syncing a live database corrupts it (bundles are the way to move
+  a library). Rebuildable caches are excluded from Time Machine. Processing keeps running when
+  the window is closed, and the Mac does not go to sleep until it finishes.
 - **Deleting:** deleting anything moves it to a trash, restorable for 30 days. Purging an
   original keeps its clips and attempts; purging an attempt keeps its correction labels, so
   training data is not lost.
@@ -408,7 +422,7 @@ The full module layout, dependency rules, and API are in [`BUILD_PLAN.md`](./BUI
 ```
 climbing-coach/
   apps/
-    desktop/       Electron shell
+    desktop/       Electron shell for macOS (signing, notarization, Photos import addon)
     web/           React + Vite UI (home/training log, library, auto-cut review, overlay,
                    comparison, ratings); overlay rendering and hooks live here until mobile
     server/        Local Fastify API server
@@ -444,7 +458,8 @@ climbing-coach/
 - Run pose models on the set; measure landmark stability on inverted/occluded frames. Test
   each candidate in the runtime it would ship in (ONNX Runtime or MediaPipe Tasks) on desktop
   and phones.
-- Build LGPL ffmpeg for each desktop platform and record the licensing decision (ADR-002).
+- Build one LGPL ffmpeg for macOS on Apple Silicon with VideoToolbox, check it on iPhone
+  HEVC/HDR footage, and record the licensing decision (ADR-002).
 - **Exit:** chosen pose model and runtime (ADR-001); evaluation script that scores start/fall
   detection and alignment on the labeled set, with confidence intervals.
 
@@ -472,7 +487,8 @@ climbing-coach/
 - **Exit:** a user can import a session recording, review and fine-tune the proposed cuts,
   produce one clip per attempt, rate them, log the day, and see the day on the homepage
   charts without touching a terminal. Over at least 5 real gym sessions, the median climb
-  boundary adjustment is under 0.3 s. Packaged as a signed Electron desktop app.
+  boundary adjustment is under 0.3 s. Ships as a signed and notarized macOS app (DMG,
+  Apple Silicon) that runs on a clean Mac without Gatekeeper warnings, including Photos import.
 
 ### Phase 3 — Comparison
 
@@ -509,6 +525,8 @@ climbing-coach/
 
 - Sync (iCloud/Drive or own backend), sharing comparisons with a coach, wall-space homography
   overlay, live on-wall detection while recording.
+- Windows and Linux desktop builds, and Intel Macs (per-OS ffmpeg builds, signing, and
+  replacements for the macOS integrations).
 
 ---
 
@@ -525,5 +543,7 @@ climbing-coach/
 | Activity pass misses an attempt | Active windows padded ± 3 s; recall ≥ 99% as a Phase 1 gate; "Process whole recording" fallback |
 | Long keyframe intervals make lossless cuts much longer than requested | `auto` cut mode re-encodes the clip (hardware encoder) when expansion exceeds 2 s; frame-hash verification test |
 | HDR / HEVC phone footage is slow to process and play | Capture defaults to H.264 SDR; tone-mapping at proxy size; all playback through H.264 proxies |
+| Desktop users without an Apple Silicon Mac | Mobile apps follow; the desktop stack stays cross-platform so other OSes are packaging work |
+| Notarization and signing of bundled binaries (ffmpeg, native addons) | Signed in CI from Phase 0 with a notarized test app; release checks with Gatekeeper on a clean Mac |
 | Sparse per-boulder data for ML | Stage A rule-based insights as primary value; set expectations in the UI |
 | Mobile processing cost | Offline processing after recording; per-device model size; reduced fps (15) with interpolation |

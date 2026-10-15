@@ -4,7 +4,12 @@ This document turns the product plan in [`PLAN.md`](./PLAN.md) into an engineeri
 technical stack, code modules, architecture, API, development phases, test criteria, and
 feedback loops. `PLAN.md` says *what* the app does and *why*; this document says *how it is
 built* and *how we know each part works*. Section references like "PLAN 2.4" point to the
-product plan. Revision 2 applies the plan review; see the [changelog](#9-changelog).
+product plan. Revision 2 applies the plan review; Revision 3 makes macOS the only desktop
+platform. See the [changelog](#9-changelog).
+
+Desktop target: macOS 13 Ventura or later on Apple Silicon (arm64). Windows, Linux, and Intel
+Macs are not supported in v1 (see 5.8 for what adding them would take). Mobile follows: iOS,
+then Android.
 
 Contents
 
@@ -33,11 +38,12 @@ Contents
 | Local backend | Node.js (current LTS) + Fastify | Runs the TS engine natively; HTTP range requests for video | — |
 | Database | SQLite via Drizzle ORM (better-sqlite3 on desktop, expo-sqlite on mobile) | One schema and one set of migrations for both platforms | op-sqlite on mobile if expo-sqlite is too slow |
 | Jobs | In-process job queue persisted in SQLite, DAG pipelines | Survives restarts, no extra service, independent steps run in parallel | — |
-| Video tools | ffmpeg / ffprobe, own LGPL builds per platform with hardware codecs (ADR-002) | Probe, frame decoding, proxies, lossless cut, thumbnails, export | GPL build run as a separate process (needs legal sign-off) |
-| Pose runtime (shipped) | Chosen in ADR-001. Preferred: ONNX Runtime (`onnxruntime-node` on desktop, ONNX Runtime Mobile on iOS/Android) with RTMDet + RTMPose. Alternative: MediaPipe Tasks Vision in a hidden Electron window, MediaPipe Tasks on mobile | Same model file on every platform, runs in the CLI and CI, no Python in the shipped app | Python sidecar only as a last resort |
+| Video tools | ffmpeg / ffprobe, one own LGPL build for macOS arm64 with VideoToolbox decode and encode (ADR-002) | Probe, frame decoding, proxies, lossless cut, thumbnails, export; VideoToolbox gives hardware H.264/HEVC without GPL encoders | GPL build run as a separate process (needs legal sign-off); AVFoundation through a native addon |
+| Pose runtime (shipped) | Chosen in ADR-001. Preferred: ONNX Runtime with RTMDet + RTMPose — `onnxruntime-node` with the CoreML execution provider on macOS, ONNX Runtime Mobile with CoreML on iOS and NNAPI/XNNPACK on Android; CPU provider in Linux CI. Alternative: MediaPipe Tasks Vision in a hidden Electron window, MediaPipe Tasks on mobile | Same model file on every platform; macOS and iOS share the CoreML acceleration path, which makes desktop ⇄ iPhone parity easier; runs in the CLI and CI; no Python in the shipped app | Python sidecar only as a last resort |
 | ML training | Logistic regression trained in TS (`engine/models`), runs on desktop and mobile | Small data, trivial explanations, trivial cross-platform parity | GBDT trained in `research/` and imported only if it measurably wins |
-| Desktop shell | Electron (renderer + utility process), renderer served from a custom `app://` protocol | Consistent Chromium video stack on all OSes; runs the Node backend in-process; stable origin for CSP and auth | Tauri with a Node SEA sidecar (WebKitGTK video support on Linux is the blocker) |
-| Packaging / signing | electron-builder; Apple Developer ID + notarization; Azure Trusted Signing (or EV certificate) on Windows; AppImage on Linux | Unsigned builds are blocked or warned by both OSes | — |
+| Desktop shell | Electron (renderer + utility process) for macOS arm64, renderer served from a custom `app://` protocol | Runs the Node backend in the same runtime as the engine; Chromium on macOS decodes HEVC and HDR in hardware and supports `requestVideoFrameCallback`; stable origin for CSP and auth; keeps Windows/Linux possible later | Tauri (WKWebView is fine on macOS, but the Node backend would become a separate sidecar); native SwiftUI (would rewrite the web UI and lose browser dev mode) |
+| Packaging / signing | electron-builder: DMG for download plus zip for updates (electron-updater / Squirrel.Mac); Developer ID signing with hardened runtime, notarization, and stapling; every nested executable (ffmpeg, ffprobe, `.node` addons) signed | Gatekeeper blocks unsigned or unnotarized apps | Mac App Store later (needs App Sandbox, security-scoped bookmarks for the library folder, and sandboxed ffmpeg) |
+| macOS integration | Photos import through PHPicker in a small native addon (`apps/desktop/native/photos`); `powerSaveBlocker` during ingest; Time Machine exclusion for rebuildable caches | iPhone videos usually reach the Mac through iCloud Photos, not Finder | Drag-and-drop from Finder, or "Export Unmodified Original" from Photos |
 | Web UI | React, Vite, TanStack Router, TanStack Query, Zustand (+ immer patches for undo), React Hook Form | Server state, UI state, and forms each get one tool | — |
 | Web styling | Tailwind CSS + Radix UI primitives | Accessible primitives, shared design tokens | — |
 | i18n | Lingui message catalogs from day one (English at launch) | Retrofitting strings later touches every component | i18next |
@@ -49,7 +55,8 @@ Contents
 | Unit / integration tests | Vitest, fast-check (property tests), Testing Library | — | — |
 | E2E tests | Playwright (web + Electron), Maestro (mobile) | — | Detox |
 | Lint / format | ESLint (typescript-eslint, Lingui plugin), Prettier, dependency-cruiser for module boundaries; ruff in `research/` | — | Biome |
-| CI | GitHub Actions; visual snapshots in a pinned Linux container | Font rendering differs across OSes | — |
+| Development machine | A Mac on Apple Silicon with Xcode command-line tools for packaging, native addons, and video integration tests; `engine`, `schema`, `api`, and the web UI in browser dev mode also work on Linux | — | — |
+| CI | GitHub Actions: Linux runners for lint, typecheck, unit, and engine tests; macOS arm64 runners for ffmpeg integration, Electron E2E, packaging, and notarization; visual snapshots in a pinned Linux container | Pure-TS work runs on cheaper runners; anything touching the shipped binaries runs on the target OS; font rendering is stable in the container | Self-hosted Apple Silicon Mac for hardware-encoder and CoreML benchmarks |
 | Versioning | Changesets, semver for `engine` and model artifacts | Derived data records the version that produced it | — |
 | Logging | pino (JSON, rotated files in the library folder) | Local diagnostics without telemetry | Sentry, opt-in only |
 
@@ -58,11 +65,12 @@ Contents
 - MediaPipe (Apache-2.0), RTMPose / RTMDet / MMPose (Apache-2.0), and ONNX Runtime (MIT) are
   safe to ship.
 - ffmpeg (ADR-002, Phase 0): the common prebuilt static binaries are GPL builds with libx264.
-  Default plan: build LGPL ffmpeg per platform in CI with hardware encoders (VideoToolbox on
-  macOS, Media Foundation on Windows, VAAPI on Linux). Software H.264 fallback on Linux uses
-  OpenH264, downloaded from Cisco's binary at first use (only that binary is covered by Cisco's
-  patent license). The alternative, shipping a GPL ffmpeg as a separate executable with a
-  source offer, needs a legal decision recorded in the ADR.
+  Default plan: build one LGPL ffmpeg/ffprobe for macOS arm64 in CI with VideoToolbox
+  (`h264_videotoolbox`, `hevc_videotoolbox`, hardware decode). VideoToolbox also covers the
+  no-hardware case (`-allow_sw 1` uses Apple's software encoder, for example on CI virtual
+  machines), so no third-party H.264 encoder ships. The binaries are signed with the hardened
+  runtime inside the app bundle. The alternative, shipping a GPL ffmpeg as a separate
+  executable with a source offer, needs a legal decision recorded in the ADR.
 - Ultralytics YOLO is AGPL-3.0: allowed in `research/` for the bake-off, never in shipped
   artifacts.
 
@@ -79,7 +87,9 @@ extracted into packages once a second consumer exists.
 ```
 climbing-coach/
   apps/
-    desktop/            Electron main + preload, app:// protocol, packaging, signing
+    desktop/            Electron main + preload, app:// protocol, packaging, signing,
+                        notarization (macOS arm64)
+      native/photos/    Node addon (Objective-C++ / Swift): PHPicker import from Photos
     web/                React renderer (Vite); runs inside Electron or in a browser in dev mode
       src/render/       Overlay draw commands (→ packages/render in P5.1)
       src/hooks/        Query hooks, view models, player clock, comparison controller
@@ -147,7 +157,7 @@ climbing-coach/
 | `apps/web` `src/render` | `schema`, `engine` (types only) |
 | `apps/web` `src/hooks` | `schema`, `api`, `src/render` |
 | `apps/web` pages, `src/ui` | `src/hooks`, `src/render`, `api` (types and HTTP client) |
-| `apps/desktop` | Nothing at runtime except starting `apps/server` and serving `apps/web` |
+| `apps/desktop` | Nothing at runtime except starting `apps/server`, serving `apps/web`, and its own `native/photos` addon; imports from Photos go through the same HTTP API (`api` client) |
 | `apps/mobile` | `core`, `adapters-native`, `app-hooks`, `render`, `api` |
 
 `engine` is checked by a lint rule that bans `fs`, `path`, `process`, `window`, `document`,
@@ -213,8 +223,23 @@ Desktop:
 ```
 
 If ADR-001 picks MediaPipe Tasks, the pose runtime is a hidden Electron window with WebGL;
-decoded frames reach it over a `MessagePort`. With ONNX Runtime it runs in a worker thread.
-Either way the model is loaded lazily on the first ingest, not at app start.
+decoded frames reach it over a `MessagePort`. With ONNX Runtime it runs in a worker thread
+with the CoreML execution provider (Neural Engine / GPU), falling back to the CPU provider if
+a model operator is not supported. Either way the model is loaded lazily on the first ingest,
+not at app start; CoreML's compiled-model cache lives in the app's caches folder, so only the
+first run after an install or model update pays the compile cost.
+
+macOS specifics in the main process:
+
+- While any job is running, `powerSaveBlocker.start('prevent-app-suspension')` keeps App Nap
+  and idle sleep from stalling ingest; it is released when the queue drains. Closing the
+  window keeps the app running in the Dock until jobs finish (standard macOS behavior); Quit
+  asks before cancelling running jobs.
+- The Photos import addon runs PHPicker with video-only filtering, requests the original file
+  (downloading from iCloud with progress if needed), writes it to `<libraryRoot>/originals/`,
+  and calls `POST /recordings` with `importMode: move` and the asset's creation date.
+- Dock badge with the number of recordings waiting for review; a notification when a long
+  ingest finishes while the app is in the background.
 
 Mobile:
 
@@ -317,7 +342,7 @@ Other pipelines:
 
 | Pipeline | Steps |
 | --- | --- |
-| `commit-cuts` | per item: `cut` (lossless by default) → `probe-clip` → `clip-proxy` (when the codec is not playable, the source is HDR, or > 1080p) → `thumbnail` → `slice-pose` (15 fps, re-based to clip time) → `segment-moves` (on the climb range) → `create-attempt`; then labels for the whole commit; then at `idle`: `pose-hq` (30 fps on the clip) → `segment-moves` → `attempt.updated` |
+| `commit-cuts` | per item: `cut` (lossless by default) → `probe-clip` → `clip-proxy` (when the source is HDR or > 1080p; HEVC SDR clips play directly on macOS, and HDR clips get an SDR proxy so overlays and side-by-side comparisons look consistent) → `thumbnail` → `slice-pose` (15 fps, re-based to clip time) → `segment-moves` (on the climb range) → `create-attempt`; then labels for the whole commit; then at `idle`: `pose-hq` (30 fps on the clip) → `segment-moves` → `attempt.updated` |
 | `recut` | same as `commit-cuts` for one attempt, from the original |
 | `reprocess` | `scope: active` reruns detection on the stored track; `scope: full` runs pose on the whole recording (fallback when the activity pass missed an attempt) |
 | `select-track` | `preprocess` with the chosen track → `detect` → `propose` (merged into the draft, user-edited items untouched) |
@@ -346,8 +371,20 @@ Other pipelines:
   exports/  backups/  logs/
 ```
 
-The library root is chosen on first run. `backup-db` uses the SQLite online backup API daily
-(keeps 7) and before every migration.
+The library root is chosen on first run (default `~/Movies/Climbing Coach Library`).
+`backup-db` uses the SQLite online backup API daily (keeps 7) and before every migration.
+
+macOS storage rules:
+
+- The library root may not be inside iCloud Drive, Dropbox, or another sync folder (detected
+  by path and by the `com.apple.file-provider` attributes): syncing a live SQLite WAL database
+  corrupts it. Bundles are the supported way to move a library.
+- Choosing a folder in Documents, Desktop, Downloads, or on an external drive triggers the
+  macOS privacy prompt once; the app explains it before the prompt. An external library that
+  is unplugged shows a "library unavailable" screen instead of failing jobs.
+- `proxies/`, `loupes/`, `thumbs/`, and `logs/` are rebuildable and are excluded from Time
+  Machine (`com.apple.metadata:com_apple_backup_excludeItem` attribute); originals, clips,
+  pose tracks, signals, the database, and backups are not.
 
 #### Data model (Drizzle tables)
 
@@ -398,8 +435,10 @@ comparisons; its labels stay with `subjectDeleted = true`, so training data is n
   stale URL after relaunch gets 403 and the client refetches the DTO.
 - File serving is restricted to the library root (path traversal guard). Electron runs with
   `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and a strict CSP.
-- No outbound network calls except the opt-in update check and the one-time OpenH264
-  download on Linux.
+- No outbound network calls except the opt-in update check (and Photos downloading an
+  iCloud original, which is done by the system on the user's request).
+- The app is signed with the hardened runtime and only the entitlements Electron and ONNX
+  Runtime need (JIT for V8); no camera or microphone entitlement on desktop.
 
 ### 3.3 Frontend architecture
 
@@ -443,7 +482,7 @@ the difference is a clean label.
 
 Review keyboard map: Space play/pause, ←/→ one frame, Shift+←/→ 0.5 s, `I`/`O` set climb
 start/end of the active item at the playhead, `S` split at playhead, `Delete` reject, `Tab`
-next item, `1`–`5` proximity, `Enter` commit selected, Ctrl/Cmd+Z / Shift+Ctrl/Cmd+Z undo/redo.
+next item, `1`–`5` proximity, `Enter` commit selected, Cmd+Z / Shift+Cmd+Z undo/redo (also in the Edit menu).
 
 #### State management rules
 
@@ -1009,14 +1048,14 @@ ADR-003 mobile compute (P5.1).
 
 | ID | Work package | Modules | Output |
 | --- | --- | --- | --- |
-| P0.1 | Monorepo scaffolding: pnpm (hoisted) + Turborepo, config presets, Vitest, ESLint/Prettier, Lingui setup, dependency-cruiser rules, GitHub Actions (lint, typecheck, test), pinned Linux container for visual tests, ADR template, PR template with definition of done | `config`, CI | Green empty pipeline |
+| P0.1 | Monorepo scaffolding: pnpm (hoisted) + Turborepo, config presets, Vitest, ESLint/Prettier, Lingui setup, dependency-cruiser rules, GitHub Actions (Linux and macOS arm64 runners), Apple Developer account and Developer ID certificate in CI secrets, a self-hosted reference Mac for benchmarks, pinned Linux container for visual tests, ADR template, PR template with definition of done | `config`, CI | Green empty pipeline |
 | P0.2 | Schema v1: `Us`, ULID, `PoseTrack` (display coordinate space), posebin and signals readers/writers, label JSONL schemas, JSON Schema export; TS ⇄ Python posebin round-trip test | `schema`, `research/pose-lab` | Tagged schema v1 |
 | P0.3 | Capture protocol and dataset: camera placement guide and phone settings (H.264, HDR off); 30–50 recordings (≥ 120 attempts) across slab / vert / overhang / roof, lighting, camera positions, ≥ 3 climbers, signed consent, including a few HEVC/HDR and handheld clips as robustness cases; manifest with hashes; private storage; frozen test split (30%) | `docs/capture-protocol.md`, `datasets/` | Dataset v1 |
 | P0.4 | Labeling: temporal labels (climb start, climb end, outcome, exit direction, limb placement events) in `research/label-tool`; cross-attempt move correspondences for ≥ 15 attempt pairs; keypoints on ~300 frames (≥ 100 hard: inverted, heel hooks, occluded) in CVAT | `research/label-tool` | Labels v1 |
 | P0.5 | Pose lab: MediaPipe (lite/full/heavy), RTMDet + RTMPose body26 (includes feet), YOLO-pose (research only); IoU tracking for multiple people; posebin output for the whole dataset | `research/pose-lab` | Reference pose tracks |
-| P0.6 | Bake-off and runtime decision: PCK@0.2 overall and on the hard subset, dropout, jitter on static holds; for each candidate also the shipped runtime (ONNX Runtime in Node and on mobile, MediaPipe Tasks in a hidden Electron window and on mobile): output parity with the Python reference, throughput on the reference laptop and phones, shipped size, usability from the CLI and CI | `research/pose-lab` | ADR-001 |
+| P0.6 | Bake-off and runtime decision: PCK@0.2 overall and on the hard subset, dropout, jitter on static holds; for each candidate also the shipped runtime (ONNX Runtime in Node with the CoreML provider and on mobile, MediaPipe Tasks in a hidden Electron window and on mobile): CoreML operator coverage (no silent CPU fallback for the main graph), output parity with the Python reference, throughput on the reference Mac and phones, shipped size, usability from the CLI and CI | `research/pose-lab` | ADR-001 |
 | P0.7 | Eval harness: `coach eval` (TS) scores detection, moves, and alignment from labels + cached posebins (keyed by video hash, runtime, model, sample fps) and reports metrics with 95% confidence intervals (Wilson for proportions, bootstrap for medians); Python only scores PCK | `apps/cli` (eval), `research/pose-lab` | First eval report on a baseline detector |
-| P0.8 | ffmpeg: build LGPL ffmpeg/ffprobe per platform in CI with hardware codecs; verify the filters the pipeline needs (`skip_frame`, `zscale`/`tonemap`, scaling, framemd5) | CI, `adapters-node` | ADR-002, ffmpeg artifacts |
+| P0.8 | ffmpeg: build LGPL ffmpeg/ffprobe for macOS arm64 in CI with VideoToolbox; verify the codecs and filters the pipeline needs (HEVC/H.264 hardware decode, `h264_videotoolbox` with and without `allow_sw`, `skip_frame`, `zscale`/`tonemap`, scaling, framemd5) on iPhone HEVC/HDR and Dolby Vision samples; sign with the hardened runtime and test inside a notarized dummy app | CI, `adapters-node` | ADR-002, ffmpeg artifacts |
 
 Exit gate: ADR-001 and ADR-002 accepted; schema v1 tagged; test split frozen and hashed; eval
 harness reports on the baseline; CI green.
@@ -1034,7 +1073,7 @@ Depends on P0.2, P0.6, P0.7, P0.8.
 | P1.5 | Move segmentation (on climb ranges) and fall move index | `engine/moves` |
 | P1.6 | Alignment: move matching, rest collapse, banded and open-end DTW, PCA-reduced fallback | `engine/align` |
 | P1.7 | Video tools: probe from packets, quick/full hash, frame source (keyframes, windowed decode, SDR conversion), proxy (SDR, tone-mapping), lossless / reencode / auto cut, thumbnails, filmstrip and loupe sprites | `adapters-node/video` |
-| P1.8 | Pose adapter for the ADR-001 runtime, with lazy model loading and parity tests against the Python reference | `adapters-node/pose` |
+| P1.8 | Pose adapter for the ADR-001 runtime (CoreML provider on macOS, CPU provider in Linux CI), with lazy model loading, a CoreML compiled-model cache, and parity tests against the Python reference | `adapters-node/pose` |
 | P1.9 | Fixtures: synthetic climber generator (stand → climb → fall / top / downclimb / exit at top; sit start; already on the wall at recording start; second person; walk-out; mid-climb end; long idle gaps), fixture videos (frame number burned in, VFR, rotated portrait, HEVC HDR, long GOP, panning camera, truncated file), fake ports | `test-fixtures` |
 | P1.10 | CLI: `coach process <video>`, `coach cut <video> --ranges`, `coach align <a> <b>`, `coach eval`, `coach bench` | `apps/cli` |
 | P1.11 | Parameter tuning: grid search over activity and detector parameters on the dev split; results committed with the params file | `apps/cli`, `engine` |
@@ -1050,7 +1089,7 @@ pipeline performance budgets (6.4); coverage thresholds (6.2).
 | P2-A.1 | DB schema with timestamps and tombstones, migrations, repositories; daily and pre-migration backups | `core/db`, `adapters-node` | P0.2 |
 | P2-A.2 | `core` skeleton: ports, services for settings, gyms, boulders, sessions, training logs, stats, trash; DAG job runner with resource classes | `core`, `engine/stats`, `engine/grades` | P2-A.1 |
 | P2-A.3 | Server: Fastify, auth, Host/Origin checks, problem+json, fetch-SSE events, signed media URLs, path traversal guard; conformance suite wired to HTTP | `apps/server`, `api` | P2-A.2 |
-| P2-A.4 | Web shell: router, design system, hooks (queries, event invalidation), Lingui, settings, trash page, first-run library setup; Electron dev shell with the `app://` protocol | `apps/web`, `apps/desktop` | P2-A.3 |
+| P2-A.4 | Web shell: router, design system, hooks (queries, event invalidation), Lingui, settings, trash page, first-run library setup (default folder, sync-folder check, privacy prompt explanation); Electron dev shell with the `app://` protocol, macOS menu bar (app menu, Edit with undo/redo, Window), standard shortcuts (Cmd+, settings, Cmd+O import) | `apps/web`, `apps/desktop` | P2-A.3 |
 | P2-A.5 | Homepage: today's entry form with prefill (blend + basis) and overrides, focus tags, grade breakdown; training load (rolling / EWMA) + ACWR, exertion vs. volume, focus distribution, grade pyramid, weekly summary | `apps/web`, `engine/stats` | P2-A.4 |
 | P2-B.1 | Ingest DAG (activity, windowed pose, parallel proxy, loupes) with incremental proposals; stable-size check before import; compute pool | `core`, `adapters-node` | P1, P2-A.3 |
 | P2-B.2 | Review screen: draft store with undo/redo and autosave, timeline with climb handles and shaded padding, filmstrip, activity track, loupe, split / merge / reject / add, track picker, warnings, outcome, boulder default + quick-create, proximity / exertion / tags, keyboard map | `apps/web` | P2-B.1 |
@@ -1059,10 +1098,11 @@ pipeline performance budgets (6.4); coverage thresholds (6.2).
 | P2-C.2 | Attempt player: overlay modes (video + skeleton, skeleton only, trail), move markers, climb-range adjustment | `apps/web` (`src/render`) | P2-B.3 |
 | P2-C.3 | Rating panel (proximity with anchors, CR10 exertion, outcome, fall move, tags, notes); boulder page with proximity-vs-exertion scatter; prefill wiring to homepage | `apps/web`, `core` | P2-C.2 |
 | P2-C.4 | Bundle export / import (doubles as a backup; later the desktop → phone path) | `core/BundleService`, `apps/web` | P2-B.3 |
-| P2-D.1 | Electron packaging: utility-process server, ffmpeg artifacts from P0.8, pose model files, `@electron/rebuild` for native modules, Developer ID signing + notarization, Windows signing, Linux AppImage, opt-in update channel; installer size budget | `apps/desktop` | P2-C |
-| P2-D.2 | Electron smoke tests and crash-resume tests | `apps/desktop` | P2-D.1 |
+| P2-C.5 | macOS integration: Photos import addon (PHPicker, iCloud download progress, creation date), drag-and-drop from Finder, power-save blocker during jobs, keep running after the window closes, Dock badge and completion notification, Time Machine exclusion of caches | `apps/desktop` (`native/photos`), `core/IngestService` | P2-B.1 |
+| P2-D.1 | Electron packaging for macOS arm64: utility-process server, ffmpeg artifacts from P0.8, pose model files, `@electron/rebuild` for native modules, hardened runtime and entitlements, Developer ID signing of the app and every nested binary, notarization and stapling, DMG + update zip, opt-in update channel (electron-updater); installer size budget | `apps/desktop` | P2-C |
+| P2-D.2 | Electron smoke tests and crash-resume tests on macOS 13 and the current macOS; Gatekeeper check on a clean machine | `apps/desktop` | P2-D.1 |
 
-Exit gate: E2E flows 1–5 and 7–12 (6.5); dogfood gate (≥ 5 real gym sessions processed by the
+Exit gate: E2E flows 1–5 and 7–13 (6.5); dogfood gate (≥ 5 real gym sessions processed by the
 team; median climb-boundary adjustment < 0.3 s; logging a day takes ≤ 30 s); desktop
 performance budgets (6.4).
 
@@ -1122,6 +1162,12 @@ rate → compare → log day, and for Photos import.
   already carries what sync needs.
 - Coach sharing, wall-space homography overlay, live on-wall detection while recording, route
   (rope) detection.
+- Other desktop platforms. Electron, the engine, and ffmpeg are cross-platform, so this is
+  packaging work, not a rewrite: per-OS LGPL ffmpeg builds (Media Foundation on Windows, VAAPI
+  plus an OpenH264 download on Linux), the DirectML or CPU provider for ONNX Runtime, Windows
+  code signing, Linux packages, HEVC playback through proxies where Chromium cannot decode it,
+  and platform replacements for the macOS integrations (Photos, power-save, Time Machine).
+  Intel Macs would need an x64 or universal build and their own performance budgets.
 
 ---
 
@@ -1134,8 +1180,8 @@ rate → compare → log day, and for Photos import.
 | Unit | Vitest, fast-check | `schema`, `engine`, `core` (fake ports), `render`, hooks | Every PR |
 | Contract | Vitest + pytest | posebin TS ⇄ Python, label JSONL, model artifacts, JSON Schema snapshots, pose runtime parity with the Python reference | Every PR (parity: nightly) |
 | API conformance | shared suite in `packages/api` | Same suite against (a) `core` in-process and (b) HTTP server; later (c) on device | Every PR (a, b); Phase 5 nightly (c) |
-| Integration | Vitest + real ffmpeg + fake pose | Job DAGs, video tools on fixture videos, migrations | Every PR |
-| E2E | Playwright (web + Electron), Maestro (mobile) | User flows in 6.5 | Every PR (fake pose); nightly (real pose runtime) |
+| Integration | Vitest + the shipped macOS ffmpeg build + fake pose | Job DAGs, video tools on fixture videos, migrations | Every PR (macOS runner) |
+| E2E | Playwright (web + Electron on macOS), Maestro (mobile) | User flows in 6.5; the Photos picker is replaced by a fake in CI and checked by hand in release QA | Every PR (fake pose); nightly (real pose runtime) |
 | Visual | Server-painter snapshots and Playwright screenshots in the pinned Linux container | Charts, overlays, ghost view, review timeline | Every PR |
 | Eval | `coach eval` | Accuracy on the dataset (6.3), with confidence intervals | PRs touching `engine/activity\|detect\|moves\|align\|compare` or the pose adapter; nightly full |
 | Performance | `coach bench`, Playwright traces, device runs | Budgets in 6.4 | Nightly; release |
@@ -1158,7 +1204,8 @@ rate → compare → log day, and for Photos import.
 | `core/db` | Migrations from empty and from every released schema snapshot; soft delete, restore, purge (labels kept); FK behavior (purging an original keeps clips) | All migrations |
 | `core` | DAG resume after a simulated crash at each step; parallel branches; import waits for a stable file size; labels derived on commit; cancel during ffmpeg and pose kills the work | ≥ 85% lines |
 | `adapters-node/video` | Packet-based frame table equals decoded PTS; VFR and rotation; proxy PTS equal to original PTS; HDR fixture → SDR proxy (BT.709 transfer tags); lossless cut expands outward only and contains every requested frame (framemd5); reencode cut first/last frame equal to requested (burned-in frame number); `auto` decision; rotation preserved; corrupt and truncated files fail with `UNSUPPORTED_MEDIA` without crashing | All fixture videos |
-| `adapters-node/pose` | Output on fixture clips vs. the Python reference | mean landmark difference ≤ 0.01 (normalized coords) |
+| `adapters-node/pose` | Output on fixture clips vs. the Python reference, for both the CoreML and the CPU execution provider | mean landmark difference ≤ 0.01 (normalized coords) |
+| `apps/desktop` | Power-save blocker held exactly while jobs run; quit with running jobs asks first; library on a sync folder refused; unplugged external library shows the unavailable screen; Time Machine exclusion attribute set on cache folders; Photos addon import path with a fake picker | Electron tests |
 | `apps/server` | Every route through the conformance suite; 401 without token (including `/events`); 403 for wrong Host, wrong Origin, `null` Origin, stale signature; `app://-` accepted; path traversal attempts rejected; range requests; event resume with `Last-Event-ID` | 100% of routes |
 | `apps/web` | Review draft undo/redo and autosave; handle math (climb vs. padding); `RatingPanel`; `TodayEntryForm` prefill / override; keyboard map; no literal strings (lint) | Component tests |
 | mobile | Same pose on a fixture clip on desktop and device | mean landmark difference ≤ 0.01 (normalized coords) |
@@ -1184,8 +1231,8 @@ rate → compare → log day, and for Photos import.
 
 ### 6.4 Performance budgets
 
-Reference desktop: 2021-or-newer laptop (Apple M1 or 8-core x86, no discrete GPU). Reference
-phones: iPhone 13, Pixel 7. Pose-dependent budgets assume the runtime and model chosen in
+Reference desktop: MacBook Air M1 with 8 GB of memory (the slowest supported Mac), on battery
+power and on macOS 13. Reference phones: iPhone 13, Pixel 7. Pose-dependent budgets assume the runtime and model chosen in
 ADR-001 and are re-baselined there.
 
 | Operation | Budget |
@@ -1203,7 +1250,9 @@ ADR-001 and are re-baselined there.
 | Homepage render with one year of logs | ≤ 300 ms after data arrives |
 | CRUD API p95 | ≤ 50 ms |
 | Desktop cold start to interactive home | ≤ 3 s (pose runtime loaded lazily) |
-| Desktop installer | ≤ 250 MB |
+| Desktop installer (arm64 DMG) | ≤ 250 MB |
+| Desktop peak memory during ingest (all processes) | ≤ 1.5 GB, so an 8 GB Mac does not swap |
+| Desktop energy | no sustained thermal throttling on the fanless reference Mac during a 10-min ingest |
 | Mobile: 60 s clip | proposals ≤ 120 s, no "serious" thermal state |
 | Mobile: 10-min recording with ≤ 30% active time | proposals ≤ 6 min |
 | Mobile peak memory during ingest | ≤ 600 MB |
@@ -1212,7 +1261,8 @@ Benchmarks fail CI when a result regresses by more than 10% against the stored b
 
 ### 6.5 End-to-end flows
 
-1. First run → choose library folder → empty homepage.
+1. First run → choose library folder (default `~/Movies/Climbing Coach Library`; an iCloud
+   Drive folder is refused with an explanation) → empty homepage.
 2. Log today's training → all homepage charts include the day.
 3. Import a recording with three attempts → proposals appear incrementally → move one climb
    start by five frames, split one merged proposal, reject a false positive, add a missed
@@ -1231,17 +1281,21 @@ Benchmarks fail CI when a result regresses by more than 10% against the stored b
 10. Recording with a second person climbing nearby → "Wrong climber?" → select the right
     track → proposals update; items already edited stay as they were.
 11. Import an HDR HEVC iPhone clip → SDR proxy plays; the cut clip keeps the original quality.
+    An SDR HEVC clip plays directly without a clip proxy.
 12. Recording where the activity pass misses an attempt → "Process whole recording" → the
     attempt is proposed.
+13. Import from Photos (PHPicker) a video that is only in iCloud → download progress → ingest
+    starts after the file is complete; the session date comes from the asset's creation date.
+    Closing the window during ingest keeps processing; the Mac does not sleep until it ends.
 
 ### 6.6 CI gates
 
 | Trigger | Jobs (all must pass to merge) |
 | --- | --- |
-| Every PR | lint, typecheck, dependency rules, unit, contract, conformance (in-process + HTTP), integration with ffmpeg, Playwright E2E with fake pose, visual snapshots, web bundle size check |
+| Every PR | Linux: lint, typecheck, dependency rules, unit, contract, in-process conformance, visual snapshots, web bundle size check. macOS arm64: HTTP conformance, integration with the shipped ffmpeg build, Playwright E2E in Electron with fake pose |
 | PR touching activity, detection, moves, alignment, comparison, or the pose adapter | + eval on the dev split using cached posebins; metric deltas with intervals posted as a PR comment; merge blocked if any 6.3 metric drops below target or by > 1 point |
-| Nightly | Full eval on the test split with the shipped pose runtime, pose parity, benchmarks, Electron packaging smoke, E2E with the real pose runtime, (Phase 5) device conformance and Maestro runs |
-| Release | Signed and notarized builds, installer size check, migration tests from every released schema, manual gym QA checklist |
+| Nightly | Full eval on the test split with the shipped pose runtime, pose parity (CPU provider on Linux, CoreML provider on macOS), benchmarks on the self-hosted reference Mac (hosted macOS runners are virtual machines and may not expose the Neural Engine or hardware video encoders), Electron packaging smoke, E2E with the real pose runtime, (Phase 5) device conformance and Maestro runs |
+| Release | macOS arm64 build signed with the hardened runtime, notarized, and stapled; `spctl --assess` and `codesign --verify --deep --strict` pass on the DMG and every nested binary; installer size check; migration tests from every released schema; clean-install launch on the oldest supported macOS (13); manual gym QA checklist |
 
 Manual gym QA checklist (per release): record two sessions on two walls with a propped phone
 (one in HDR); run the whole review flow; compare two attempts; log both days; check that no
@@ -1345,8 +1399,11 @@ has a consumer that changes the product. Nothing leaves the device unless the us
 | Activity pass misses an attempt | Phase 1 metric (active-window recall) | "Process whole recording" (`scope: full`); windows padded ± 3 s |
 | Long keyframe intervals on some cameras make lossless cuts much longer than requested | Phase 1 fixtures | `auto` re-encodes when expansion > 2 s |
 | HDR tone-mapping cost | Phase 1 benchmarks | GPU tone-mapping filters; capture defaults to SDR; proxy at 720p |
-| HEVC playback in the renderer on Linux | Phase 2 | All playback goes through H.264 proxies |
-| Installer size, signing, notarization | Phase 2-D | Download pose models on first use; budget enforced in release CI |
+| CoreML provider does not support every operator of the chosen model, or its output drifts from the reference | ADR-001 (P0.6) | Partition check in the bake-off; CPU provider (still fast on Apple Silicon); MediaPipe Tasks |
+| Hosted macOS CI runners are virtual machines that may not expose the Neural Engine or hardware video encoders | P0.1 | Functional tests use the CPU provider and `allow_sw`; budgets measured on the self-hosted reference Mac |
+| Installer size, signing, notarization of nested binaries (ffmpeg, `.node` addons) | P0.8 dummy app, Phase 2-D | Sign every binary in CI with the hardened runtime; download pose models on first use; budget enforced in release CI |
+| Photos addon cost or PHPicker limits | P2-C.5 | Drag-and-drop from Finder and "Export Unmodified Original" from Photos, documented in the import screen |
+| Windows, Linux, and Intel Mac users cannot use the desktop app | Product decision (Revision 3) | The mobile apps (Phase 5); the desktop stack stays cross-platform so other OSes are packaging work (5.8) |
 | Engine compute on mobile blocks the UI thread | P5.1 spike | Chunked scheduling; PCA-reduced DTW; native module for DTW |
 | Background processing limits on iOS | P5.1 spike | Foreground processing with progress; per-attempt recordings; jobs resume on relaunch |
 | Sparse labels for Phase 4 models | P4.0 | Stage A rules remain the primary insight source; models stay in shadow |
@@ -1356,6 +1413,25 @@ has a consumer that changes the product. Nothing leaves the device unless the us
 ---
 
 ## 9. Changelog
+
+Revision 3 (macOS desktop):
+
+- The desktop app targets macOS 13 or later on Apple Silicon only; Windows, Linux, and Intel
+  Macs move to Phase 6 as packaging work.
+- One LGPL ffmpeg build for macOS arm64 with VideoToolbox (hardware, or Apple's software
+  encoder with `allow_sw`); the OpenH264 download and per-OS builds are gone.
+- ONNX Runtime uses the CoreML execution provider on macOS, the same acceleration path as iOS.
+- HEVC SDR clips play directly; HDR clips still get an SDR proxy.
+- Electron is kept over Tauri and SwiftUI: the backend stays in Node next to the engine.
+- Packaging is a DMG plus update zip with hardened runtime, Developer ID signing of every
+  nested binary, notarization, and stapling.
+- New macOS integrations: Photos import (PHPicker addon), power-save blocker during jobs,
+  running after the window closes, Dock badge and notifications, Time Machine exclusion of
+  caches, refusal of sync folders as the library root, privacy-prompt and unplugged-drive
+  handling, macOS menus and shortcuts.
+- CI splits into Linux runners (pure TS) and macOS arm64 runners (binaries, Electron,
+  notarization), with a self-hosted reference Mac (MacBook Air M1, 8 GB) for benchmarks;
+  new memory and thermal budgets; new E2E flow 13 (Photos import).
 
 Revision 2 (plan review applied):
 
