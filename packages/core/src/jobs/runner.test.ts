@@ -71,9 +71,10 @@ describe('job runner', () => {
       },
     });
     const job = runner.enqueue('chain', {});
-    await runner.tick();
+    expect(await runner.tick()).toBe(1);
     expect(runner.get(job.id).steps.map((s) => s.status)).toEqual(['succeeded', 'queued']);
-    await runner.tick();
+    expect(await runner.tick()).toBe(1);
+    expect(await runner.tick()).toBe(0);
     const done = runner.get(job.id);
     expect(done.status).toBe('succeeded');
     expect(done.result).toEqual({ ok: true });

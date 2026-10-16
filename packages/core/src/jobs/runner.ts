@@ -27,8 +27,11 @@ export type JobRunner = {
   retry(id: string): Accepted;
   /** Requeues steps left `running` by a previous process. Call once at startup. */
   recover(): number;
-  /** Starts every runnable step that fits its resource class and resolves when they finish. */
-  tick(): Promise<void>;
+  /**
+   * Starts every runnable step that fits its resource class and resolves, with how many it
+   * started, when they finish. Overlapping ticks are safe: running steps count against limits.
+   */
+  tick(): Promise<number>;
 };
 
 export type JobRunnerOptions = {
@@ -228,6 +231,7 @@ export function createJobRunner(opts: JobRunnerOptions): JobRunner {
         }
       }
       await Promise.all(started);
+      return started.length;
     },
   };
 }

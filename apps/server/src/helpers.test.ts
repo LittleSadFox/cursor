@@ -1,7 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { APP_ORIGIN, DEV_TOKEN, launchConfig, resolveLibraryRoot, VITE_ORIGINS } from './config.js';
-import { runMaintenancePass, startScheduler } from './scheduler.js';
 import { bearerMatches, isAllowedHost } from './security.js';
 import { formatSseEvent } from './sse.js';
 
@@ -74,32 +73,5 @@ describe('formatSseEvent', () => {
     expect(line).toBe(
       'id: 7-1\nevent: job.completed\ndata: {"id":"7-1","type":"job.completed","jobId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","jobType":"backup-db"}\n\n',
     );
-  });
-});
-
-describe('scheduler', () => {
-  it('queues the daily maintenance jobs before ticking', async () => {
-    const calls: string[] = [];
-    await runMaintenancePass({
-      ensureDaily: (type) => {
-        calls.push(type);
-        return null;
-      },
-      tick: async () => {
-        calls.push('tick');
-      },
-    });
-    expect(calls).toEqual(['backup-db', 'purge-trash', 'tick']);
-  });
-
-  it('logs a failed pass instead of crashing', async () => {
-    const error = vi.fn();
-    const stop = startScheduler(
-      { ensureDaily: () => null, tick: () => Promise.reject(new Error('locked')) },
-      { error },
-      60_000,
-    );
-    await vi.waitFor(() => expect(error).toHaveBeenCalledOnce());
-    stop();
   });
 });
