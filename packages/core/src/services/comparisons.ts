@@ -11,6 +11,7 @@ import {
 import { ENGINE_VERSION } from '@climbing-coach/engine';
 import { readComparisonBin, type ComparisonBin } from '@climbing-coach/schema';
 
+import { needsRequeue, sameSides } from '../comparisons/cache.js';
 import { RESULT_CHANNELS } from '../comparisons/compute.js';
 import { assertSupportedOptions, comparisonKey } from '../comparisons/options.js';
 import { resolveSide, sharedPoseModel } from '../comparisons/sides.js';
@@ -18,6 +19,7 @@ import {
   findComparisonByKey,
   getComparisonRecord,
   insertComparison,
+  supersedeComparison,
   updateComparison,
   type ComparisonRecord,
 } from '../db/repos/comparisons.js';
@@ -33,7 +35,7 @@ export type ComparisonServiceDeps = {
   db: AppDatabase;
   clock: Clock;
   ids: IdGen;
-  runner: Pick<JobRunner, 'enqueue' | 'get'>;
+  runner: Pick<JobRunner, 'enqueue' | 'get' | 'cancel'>;
   blobs?: BlobStore | undefined;
   ffmpegAvailable: boolean;
 };
@@ -136,6 +138,24 @@ export function createComparisonService(deps: ComparisonServiceDeps): CoachApi['
     });
   }
 
+  function cancelJob(jobId: string | null): void {
+    if (jobId === null) return;
+    try {
+      deps.runner.cancel(jobId);
+    } catch {
+      // Already finished, or gone: nothing left to stop.
+    }
+  }
+
+  /** The cached row for these exact inputs, after retiring one computed from stale inputs. */
+  function reusable(cached: ComparisonRecord | null, sides: ComparisonRecord['sides']) {
+    if (!cached) return null;
+    if (sameSides(cached.sides, sides)) return withJobStatus(cached, deps.runner);
+    cancelJob(cached.jobId);
+    supersedeComparison(db, clock, cached.id);
+    return null;
+  }
+
   return {
     async create(raw) {
       const input = parseInput(ComparisonInputSchema, raw);
@@ -148,11 +168,9 @@ export function createComparisonService(deps: ComparisonServiceDeps): CoachApi['
         sharedPoseModel(a, b),
         input.options,
       );
-      const cached = findComparisonByKey(db, key);
-      if (cached) {
-        const current = withJobStatus(cached, deps.runner);
-        return toComparison(current.status === 'failed' ? requeue(current) : current);
-      }
+      const sides = { a: a.side, b: b.side };
+      const current = reusable(findComparisonByKey(db, key), sides);
+      if (current) return toComparison(needsRequeue(current) ? requeue(current) : current);
       const id = deps.ids.ulid();
       const job = deps.runner.enqueue('compare', { comparisonId: id });
       return toComparison(
@@ -161,7 +179,7 @@ export function createComparisonService(deps: ComparisonServiceDeps): CoachApi['
           id,
           jobId: job.id,
           options: input.options,
-          sides: { a: a.side, b: b.side },
+          sides,
         }),
       );
     },

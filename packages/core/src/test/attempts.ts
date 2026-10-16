@@ -99,6 +99,41 @@ export type SeededAttempt = {
   path: string;
 };
 
+export type HqTrack = {
+  db: AppDatabase;
+  blobs: BlobStore;
+  now: string;
+  videoId: string;
+  poseTrackId: string;
+  frames: readonly RawSample[];
+  model?: string | undefined;
+  modelVersion?: string | undefined;
+};
+
+/** Writes an HQ posebin and its `pose_tracks` row. Returns the library path. */
+export async function insertHqTrack(track: HqTrack): Promise<string> {
+  const { db, now, videoId, poseTrackId } = track;
+  const model = track.model ?? 'rtmpose-m-body26';
+  const modelVersion = track.modelVersion ?? '1';
+  const path = `pose/${videoId}.${poseTrackId}.hq.posebin`;
+  await track.blobs.write(path, posebinOf(videoId, poseTrackId, track.frames, model, modelVersion));
+  db.insert(poseTracks)
+    .values({
+      id: poseTrackId,
+      videoId,
+      kind: 'hq',
+      runtime: 'test',
+      model,
+      modelVersion,
+      sampleFps: 15,
+      path,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  return path;
+}
+
 /**
  * Inserts a clip video, its HQ pose track (posebin in `blobs`), and an attempt over the whole
  * clip — the rows P2-B's commit pipeline will write once ingest exists.
@@ -111,7 +146,7 @@ export function attemptSeeder(db: AppDatabase, clock: Clock, blobs: BlobStore) {
     const videoId = ids.ulid();
     const poseTrackId = ids.ulid();
     const attemptId = ids.ulid();
-    const path = `pose/${videoId}.hq.posebin`;
+    let path = '';
     db.insert(videos)
       .values({
         id: videoId,
@@ -122,23 +157,16 @@ export function attemptSeeder(db: AppDatabase, clock: Clock, blobs: BlobStore) {
       })
       .run();
     if (options.hq !== false) {
-      const model = options.model ?? 'rtmpose-m-body26';
-      const modelVersion = options.modelVersion ?? '1';
-      await blobs.write(path, posebinOf(videoId, poseTrackId, frames, model, modelVersion));
-      db.insert(poseTracks)
-        .values({
-          id: poseTrackId,
-          videoId,
-          kind: 'hq',
-          runtime: 'test',
-          model,
-          modelVersion,
-          sampleFps: 15,
-          path,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
+      path = await insertHqTrack({
+        db,
+        blobs,
+        now,
+        videoId,
+        poseTrackId,
+        frames,
+        model: options.model,
+        modelVersion: options.modelVersion,
+      });
     }
     db.insert(attempts)
       .values({

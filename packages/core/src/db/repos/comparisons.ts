@@ -129,6 +129,14 @@ export function insertComparison(
   return getComparisonRecord(db, record.id);
 }
 
+/** Retires a cached row whose inputs changed, freeing its cache key for a fresh comparison. */
+export function supersedeComparison(db: AppDatabase, clock: Clock, id: string): void {
+  db.update(comparisons)
+    .set({ deletedAt: clock.nowIso(), updatedAt: clock.nowIso() })
+    .where(and(eq(comparisons.id, id), isNull(comparisons.deletedAt)))
+    .run();
+}
+
 export function updateComparison(
   db: AppDatabase,
   clock: Clock,

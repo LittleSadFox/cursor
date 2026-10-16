@@ -1,11 +1,15 @@
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
 import { ProblemError, type CoachEvent, type Comparison } from '@climbing-coach/api';
 import { readPosebin } from '@climbing-coach/schema';
 
+import { comparisonKey } from '../comparisons/options.js';
 import { alignmentRegressionCases } from '../comparisons/regression.js';
 import { listLabels } from '../db/repos/labels.js';
-import { attemptSeeder, climbFrames, closeRightKnee } from '../test/attempts.js';
+import { attempts } from '../db/schema.js';
+import { createIdGen, sequentialRandomBytes } from '../ids/ulid.js';
+import { attemptSeeder, climbFrames, closeRightKnee, insertHqTrack } from '../test/attempts.js';
 import { createTestApi, memoryBlobs } from '../test/fakes.js';
 
 function setup(options: { ffmpegAvailable?: boolean } = {}) {
@@ -242,6 +246,86 @@ describe('comparisons', () => {
     expect(await codeOf(api.comparisons.export(created.id, { layout: 'nope' as 'ghost' }))).toBe(
       'VALIDATION_FAILED',
     );
+  });
+});
+
+describe('comparison cache invalidation', () => {
+  it('recomputes after a pose track is re-extracted with the same model', async () => {
+    const { api, seed, drain, memory, blobs, clock } = setup();
+    const a = await seed();
+    const b = await seed();
+    const input = { attemptAId: a.attemptId, attemptBId: b.attemptId };
+    const first = await api.comparisons.create(input);
+    await drain();
+
+    clock.advance(1000);
+    const poseTrackId = createIdGen(clock, sequentialRandomBytes(3)).ulid();
+    await insertHqTrack({
+      db: memory.db,
+      blobs,
+      now: clock.nowIso(),
+      videoId: b.videoId,
+      poseTrackId,
+      frames: closeRightKnee(climbFrames(), 15),
+    });
+    const second = await api.comparisons.create(input);
+    expect(second.id).not.toBe(first.id);
+    expect(second.status).toBe('pending');
+    expect(second.b.poseTrackId).toBe(poseTrackId);
+    expect(await codeOf(api.comparisons.get(first.id))).toBe('NOT_FOUND');
+    await drain();
+    const top = (await api.comparisons.get(second.id)).summary.topDifferences[0];
+    expect(top?.joint).toBe('rightKnee');
+    expect((await api.comparisons.create(input)).id).toBe(second.id);
+  });
+
+  it('recomputes after the climb range changes and cancels the stale job', async () => {
+    const { api, seed, memory } = setup();
+    const a = await seed();
+    const b = await seed();
+    const input = { attemptAId: a.attemptId, attemptBId: b.attemptId };
+    const first = await api.comparisons.create(input);
+    memory.db
+      .update(attempts)
+      .set({ climbStartUs: 500_000 })
+      .where(eq(attempts.id, a.attemptId))
+      .run();
+    const second = await api.comparisons.create(input);
+    expect(second.id).not.toBe(first.id);
+    expect(second.a.climbStartUs).toBe(500_000);
+    expect((await api.jobs.get(first.jobId as string)).status).toBe('cancelled');
+  });
+
+  it('recomputes a pending row left without a job by migration 0002', async () => {
+    const { api, seed, drain, memory } = setup();
+    const a = await seed();
+    const b = await seed();
+    const key = comparisonKey(a.attemptId, b.attemptId, 'rtmpose-m-body26@1', {
+      collapseRests: true,
+      spatialMode: 'body',
+    });
+    memory.sql.run(
+      `INSERT INTO comparisons (id, attempt_a_id, attempt_b_id, pose_model, engine_version,
+        options_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        key.attemptAId,
+        key.attemptBId,
+        key.poseModel,
+        key.engineVersion,
+        key.optionsHash,
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z',
+      ],
+    );
+    const created = await api.comparisons.create({
+      attemptAId: a.attemptId,
+      attemptBId: b.attemptId,
+    });
+    expect(created.id).not.toBe('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+    expect(created.jobId).not.toBeNull();
+    await drain();
+    expect((await api.comparisons.get(created.id)).status).toBe('ready');
   });
 });
 
