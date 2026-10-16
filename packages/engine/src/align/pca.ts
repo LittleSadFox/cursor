@@ -60,29 +60,38 @@ function dot(left: readonly number[], right: readonly number[]): number {
   return sum;
 }
 
-/** Jacobi eigen-decomposition. Columns of the returned vectors are the largest components. */
-function topEigenvectors(matrix: number[][], count: number): number[][] {
+const MAX_SWEEPS = 60;
+
+function squaredNorms(matrix: readonly number[][]): { off: number; total: number } {
+  let off = 0;
+  let total = 0;
+  matrix.forEach((row, i) =>
+    row.forEach((value, j) => {
+      total += value * value;
+      if (i !== j) off += value * value;
+    }),
+  );
+  return { off, total };
+}
+
+/**
+ * Cyclic Jacobi eigen-decomposition, swept until the off-diagonal mass is negligible.
+ * Columns of the returned vectors are the largest components.
+ */
+export function topEigenvectors(matrix: number[][], count: number): number[][] {
   const n = matrix.length;
   const work = matrix.map((row) => [...row]);
   const vectors = Array.from({ length: n }, (_, i) =>
     Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
   );
-  for (let iter = 0; iter < 40; iter += 1) {
-    let p = 0;
-    let q = 1;
-    let max = 0;
-    for (let i = 0; i < n; i += 1) {
-      for (let j = i + 1; j < n; j += 1) {
-        const value = Math.abs(work[i]?.[j] ?? 0);
-        if (value > max) {
-          max = value;
-          p = i;
-          q = j;
-        }
+  for (let sweep = 0; sweep < MAX_SWEEPS; sweep += 1) {
+    const { off, total } = squaredNorms(work);
+    if (off <= 1e-24 * total || off === 0) break;
+    for (let p = 0; p < n - 1; p += 1) {
+      for (let q = p + 1; q < n; q += 1) {
+        if (Math.abs(work[p]?.[q] ?? 0) > 1e-300) rotate(work, vectors, p, q);
       }
     }
-    if (max < 1e-12) break;
-    rotate(work, vectors, p, q);
   }
   const order = Array.from({ length: n }, (_, index) => index).sort(
     (a, b) => Math.abs(work[b]?.[b] ?? 0) - Math.abs(work[a]?.[a] ?? 0),

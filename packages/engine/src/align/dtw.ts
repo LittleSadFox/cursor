@@ -2,28 +2,42 @@ export type DtwStep = { indexA: number; indexB: number };
 
 export type DtwResult = { path: DtwStep[]; cost: number };
 
-function cellCost(left: readonly number[], right: readonly number[]): number {
-  const width = Math.max(left.length, right.length);
+const DIAG = 0;
+const UP = 1;
+const ACROSS = 2;
+
+type Series = { data: Float64Array; length: number; width: number };
+
+function flatten(rows: readonly (readonly number[])[], width: number): Series {
+  const data = new Float64Array(rows.length * width);
+  rows.forEach((row, i) => {
+    for (let k = 0; k < width; k += 1) data[i * width + k] = row[k] ?? 0;
+  });
+  return { data, length: rows.length, width };
+}
+
+function cellCost(a: Series, i: number, b: Series, j: number): number {
   let sum = 0;
-  for (let i = 0; i < width; i += 1) {
-    const delta = (left[i] ?? 0) - (right[i] ?? 0);
+  const offA = i * a.width;
+  const offB = j * b.width;
+  for (let k = 0; k < a.width; k += 1) {
+    const delta = (a.data[offA + k] ?? 0) - (b.data[offB + k] ?? 0);
     sum += delta * delta;
   }
   return sum;
 }
 
-function inBand(
+/** Columns of row `i` inside the band: `|j - center| <= band`. */
+export function bandRange(
   i: number,
-  j: number,
   n: number,
   m: number,
   band: number,
   openEnd: boolean,
-): boolean {
-  if (n <= 1 || m <= 1) return true;
-  if (openEnd) return Math.abs(j - i) <= band;
-  const expected = (i * (m - 1)) / (n - 1);
-  return Math.abs(j - expected) <= band;
+): [number, number] {
+  if (n <= 1 || m <= 1) return [0, m - 1];
+  const center = openEnd ? i : (i * (m - 1)) / (n - 1);
+  return [Math.max(0, Math.ceil(center - band)), Math.min(m - 1, Math.floor(center + band))];
 }
 
 /**
@@ -47,6 +61,82 @@ export function openEndDtw(
   return alignDtw(left, right, bandFraction, true);
 }
 
+/**
+ * Accumulated cost over the band only. Keeps two cost rows and one step byte per cell,
+ * so memory is O(n·m) bytes rather than O(n·m) doubles.
+ */
+function fillCosts(
+  a: Series,
+  b: Series,
+  band: number,
+  openEnd: boolean,
+): { steps: Uint8Array; lastRow: Float64Array } {
+  const n = a.length;
+  const m = b.length;
+  const steps = new Uint8Array(n * m);
+  let previous = new Float64Array(m).fill(Number.POSITIVE_INFINITY);
+  let current = new Float64Array(m);
+  for (let i = 0; i < n; i += 1) {
+    current.fill(Number.POSITIVE_INFINITY);
+    const [lo, hi] = bandRange(i, n, m, band, openEnd);
+    for (let j = lo; j <= hi; j += 1) {
+      const step = cellCost(a, i, b, j);
+      if (i === 0 && j === 0) {
+        current[0] = step;
+        continue;
+      }
+      const diag = i > 0 && j > 0 ? (previous[j - 1] ?? Infinity) : Infinity;
+      const up = i > 0 ? (previous[j] ?? Infinity) : Infinity;
+      const across = j > 0 ? (current[j - 1] ?? Infinity) : Infinity;
+      let best = diag;
+      let from = DIAG;
+      if (up < best) {
+        best = up;
+        from = UP;
+      }
+      if (across < best) {
+        best = across;
+        from = ACROSS;
+      }
+      if (best === Infinity) continue;
+      current[j] = best + step;
+      steps[i * m + j] = from;
+    }
+    [previous, current] = [current, previous];
+  }
+  return { steps, lastRow: previous };
+}
+
+function endColumn(lastRow: Float64Array, openEnd: boolean): number {
+  const m = lastRow.length;
+  if (!openEnd) return m - 1;
+  let best = m - 1;
+  for (let j = 0; j < m; j += 1) {
+    if ((lastRow[j] ?? Infinity) < (lastRow[best] ?? Infinity)) best = j;
+  }
+  return best;
+}
+
+function tracePath(steps: Uint8Array, m: number, endI: number, endJ: number): DtwStep[] {
+  const path: DtwStep[] = [];
+  let i = endI;
+  let j = endJ;
+  while (i > 0 || j > 0) {
+    path.push({ indexA: i, indexB: j });
+    const from = steps[i * m + j] ?? DIAG;
+    if (from === DIAG && i > 0 && j > 0) {
+      i -= 1;
+      j -= 1;
+    } else if ((from === UP && i > 0) || j === 0) {
+      i -= 1;
+    } else {
+      j -= 1;
+    }
+  }
+  path.push({ indexA: 0, indexB: 0 });
+  return path.reverse();
+}
+
 function alignDtw(
   left: readonly (readonly number[])[],
   right: readonly (readonly number[])[],
@@ -56,78 +146,11 @@ function alignDtw(
   const n = left.length;
   const m = right.length;
   if (n === 0 || m === 0) return { path: [], cost: 0 };
+  const width = Math.max(left[0]?.length ?? 0, right[0]?.length ?? 0);
   const band = Math.max(1, Math.ceil(bandFraction * Math.max(n, m)));
-  const cost: number[][] = Array.from({ length: n }, () =>
-    Array.from({ length: m }, () => Number.POSITIVE_INFINITY),
-  );
-  const from: number[][] = Array.from({ length: n }, () => Array.from({ length: m }, () => 0));
-  const origin = cost[0];
-  if (origin) origin[0] = cellCost(left[0] ?? [], right[0] ?? []);
-  for (let i = 0; i < n; i += 1) {
-    for (let j = 0; j < m; j += 1) {
-      if ((i === 0 && j === 0) || !inBand(i, j, n, m, band, openEnd)) continue;
-      const step = cellCost(left[i] ?? [], right[j] ?? []);
-      let best = Number.POSITIVE_INFINITY;
-      let stepFrom = 0;
-      const diag =
-        i > 0 && j > 0
-          ? (cost[i - 1]?.[j - 1] ?? Number.POSITIVE_INFINITY)
-          : Number.POSITIVE_INFINITY;
-      const up = i > 0 ? (cost[i - 1]?.[j] ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
-      const across =
-        j > 0 ? (cost[i]?.[j - 1] ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
-      if (diag < best) {
-        best = diag;
-        stepFrom = 0;
-      }
-      if (up < best) {
-        best = up;
-        stepFrom = 1;
-      }
-      if (across < best) {
-        best = across;
-        stepFrom = 2;
-      }
-      if (Number.isFinite(best)) {
-        const row = cost[i];
-        const fromRow = from[i];
-        if (row) row[j] = best + step;
-        if (fromRow) fromRow[j] = stepFrom;
-      }
-    }
-  }
-  let endJ = m - 1;
-  if (openEnd) {
-    let best = Number.POSITIVE_INFINITY;
-    const last = cost[n - 1] ?? [];
-    for (let j = 0; j < m; j += 1) {
-      const value = last[j] ?? Number.POSITIVE_INFINITY;
-      if (value < best) {
-        best = value;
-        endJ = j;
-      }
-    }
-  }
-  const endCost = cost[n - 1]?.[endJ] ?? Number.POSITIVE_INFINITY;
-  if (!Number.isFinite(endCost)) return { path: [], cost: endCost };
-  const path: DtwStep[] = [];
-  let i = n - 1;
-  let j = endJ;
-  while (i > 0 || j > 0) {
-    path.push({ indexA: i, indexB: j });
-    const stepFrom = from[i]?.[j] ?? 0;
-    if (stepFrom === 0 && i > 0 && j > 0) {
-      i -= 1;
-      j -= 1;
-    } else if (stepFrom === 1 && i > 0) {
-      i -= 1;
-    } else if (j > 0) {
-      j -= 1;
-    } else {
-      i -= 1;
-    }
-  }
-  path.push({ indexA: 0, indexB: 0 });
-  path.reverse();
-  return { path, cost: endCost };
+  const { steps, lastRow } = fillCosts(flatten(left, width), flatten(right, width), band, openEnd);
+  const endJ = endColumn(lastRow, openEnd);
+  const cost = lastRow[endJ] ?? Infinity;
+  if (!Number.isFinite(cost)) return { path: [], cost };
+  return { path: tracePath(steps, m, n - 1, endJ), cost };
 }

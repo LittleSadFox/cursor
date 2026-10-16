@@ -11,6 +11,7 @@ export type AlignFrame = {
 };
 
 export type AlignOptions = {
+  /** `left` ended early (a fall): align all of it to a prefix of `right`. Default false. */
   openEnd?: boolean;
   bandFraction?: number;
   pcaComponents?: number;
@@ -24,28 +25,41 @@ export type AlignResult = {
   cost: number;
 };
 
-function zscore(rows: number[][]): number[][] {
-  if (rows.length === 0) return [];
+/**
+ * Z-score each column with statistics pooled over both attempts, so a shared offset
+ * stays visible and a prefix is scaled the same way as the full attempt.
+ */
+export function zscorePair(
+  left: readonly (readonly number[])[],
+  right: readonly (readonly number[])[],
+): { left: number[][]; right: number[][] } {
+  const rows = [...left, ...right];
   const width = rows[0]?.length ?? 0;
-  const mean = Array.from({ length: width }, () => 0);
+  const mean = new Float64Array(width);
+  const variance = new Float64Array(width);
   for (const row of rows) {
     for (let col = 0; col < width; col += 1) mean[col] = (mean[col] ?? 0) + (row[col] ?? 0);
   }
-  for (let col = 0; col < width; col += 1) mean[col] = (mean[col] ?? 0) / rows.length;
-  const variance = Array.from({ length: width }, () => 0);
+  for (let col = 0; col < width; col += 1) mean[col] = (mean[col] ?? 0) / Math.max(1, rows.length);
   for (const row of rows) {
     for (let col = 0; col < width; col += 1) {
       const delta = (row[col] ?? 0) - (mean[col] ?? 0);
       variance[col] = (variance[col] ?? 0) + delta * delta;
     }
   }
-  const scale = variance.map((value) => {
+  const scale = Array.from(variance, (value) => {
     const std = Math.sqrt(value / Math.max(1, rows.length));
     return std > 1e-8 ? std : 1;
   });
-  return rows.map((row) => row.map((value, col) => (value - (mean[col] ?? 0)) / (scale[col] ?? 1)));
+  const apply = (row: readonly number[]): number[] =>
+    Array.from(
+      { length: width },
+      (_, col) => ((row[col] ?? 0) - (mean[col] ?? 0)) / (scale[col] ?? 1),
+    );
+  return { left: left.map(apply), right: right.map(apply) };
 }
 
+/** Rest collapse, pooled z-score, shared PCA basis, then banded (or open-end) DTW. */
 export function align(
   left: readonly AlignFrame[],
   right: readonly AlignFrame[],
@@ -60,15 +74,14 @@ export function align(
   const b = collapseRests(right, rest);
   const band = options.bandFraction ?? STARTING_PARAMS.align.dtwBandFraction;
   const components = options.pcaComponents ?? STARTING_PARAMS.align.pcaComponents;
-  const reduced = reducePair(
+  const scaled = zscorePair(
     a.map((frame) => frame.values),
     b.map((frame) => frame.values),
-    components,
   );
-  const za = zscore(reduced.left);
-  const zb = zscore(reduced.right);
-  const openEnd = options.openEnd ?? a.length <= b.length;
-  const dtw = openEnd && a.length !== b.length ? openEndDtw(za, zb, band) : bandedDtw(za, zb, band);
+  const reduced = reducePair(scaled.left, scaled.right, components);
+  const dtw = options.openEnd
+    ? openEndDtw(reduced.left, reduced.right, band)
+    : bandedDtw(reduced.left, reduced.right, band);
   return {
     cost: dtw.cost,
     path: dtw.path.map((step: DtwStep) => ({
