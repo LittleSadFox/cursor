@@ -47,12 +47,12 @@
     {
       "id": "iphone-hevc-hdr",
       "hook": "iphone/",
-      "reason": "Need a user-supplied iPhone HEVC/HDR .mov. Public samples are not phone recordings."
+      "reason": "Genuine iPhone HEVC/HLG/DV 8.4 clips exist in the private store. CI cannot read them; run scripts/ffmpeg/verify-iphone.sh --from-store. Do not commit footage."
     },
     {
-      "id": "iphone-dolby-vision",
+      "id": "iphone-sdr-1080p30-landscape",
       "hook": "iphone/",
-      "reason": "Need a user-supplied iPhone Dolby Vision clip. FATE P5/P8.1 only prove the decoder, not iPhone packing."
+      "reason": "Still missing from the user: SDR (HDR off), 1080p30 (we have 1080p60 HDR), and landscape."
     }
   ]
 }

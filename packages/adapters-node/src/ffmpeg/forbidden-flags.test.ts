@@ -43,5 +43,18 @@ describe('LGPL build scripts', () => {
     expect(forbiddenConfigureFlags(build)).toEqual([]);
     expect(build).toContain('FFMPEG_LGPL_CONFIGURE_FLAGS');
     expect(build).toMatch(/\$\{FFMPEG_LGPL_CONFIGURE_FLAGS\[@\]\}/);
+    expect(build).toContain('configureFlags');
+  });
+
+  it('keeps download-samples.sh checksums in sync with the public sample manifest', () => {
+    const root = detectRepoRoot();
+    const samples = readFileSync(join(root!, 'scripts/ffmpeg/download-samples.sh'), 'utf8');
+    const manifest = JSON.parse(
+      readFileSync(join(root!, 'datasets/ffmpeg-samples/manifest.json'), 'utf8'),
+    ) as { samples: { sha256: string; source: string }[] };
+    for (const sample of manifest.samples) {
+      expect(samples).toContain(sample.sha256);
+      expect(samples).toContain(sample.source);
+    }
   });
 });

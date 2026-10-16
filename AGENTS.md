@@ -75,7 +75,7 @@ pnpm build
 | Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                                            |
 
 CI: `.github/workflows/ci.yml` (Linux lint/typecheck/test/deps + Python posebin; macOS arm64
-schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
+schema smoke + LGPL ffmpeg build/verify). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## Coding conventions
 

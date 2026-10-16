@@ -27,9 +27,17 @@ describe('isIphoneMediaName', () => {
 
 describe('ffmpegMappedOutputArgs', () => {
   it('maps 0:v:0 and never 0:a (apac)', () => {
-    expect(ffmpegMappedOutputArgs()).toEqual(['-map', '0:v:0', '-an']);
-    expect(ffmpegMappedOutputArgs({ audio: true })).toEqual(['-map', '0:v:0', '-map', '0:a:0']);
+    expect(ffmpegMappedOutputArgs()).toEqual(['-map', '0:v:0', '-an', '-fps_mode', 'vfr']);
+    expect(ffmpegMappedOutputArgs({ audio: true })).toEqual([
+      '-map',
+      '0:v:0',
+      '-map',
+      '0:a:0',
+      '-fps_mode',
+      'vfr',
+    ]);
     expect(ffmpegMappedOutputArgs({ audio: true }).join(' ')).not.toContain('0:a ');
+    expect(ffmpegMappedOutputArgs({ vfr: false })).toEqual(['-map', '0:v:0', '-an']);
   });
 });
 

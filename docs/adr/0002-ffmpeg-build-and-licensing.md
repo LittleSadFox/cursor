@@ -80,7 +80,7 @@ VideoToolbox cannot cover a required encode. That would need a new decision.
 | HEVC/H.264 **hardware** decode                         | Attempted via `-hwaccel videotoolbox`; soft-fail on hosted VMs                                      | Self-hosted M1 or user Mac                              |
 | Genuine iPhone HEVC/HLG HDR                            | Local `verify-iphone.sh` (HLG `arib-std-b67` tonemap, `0:v:0`, VFR, autorotate). Not in GitHub CI.  | Opt-in Mac/Linux run against private originals          |
 | Genuine iPhone Dolby Vision 8.4                        | Same local script (profile 8.4 / HLG compat). FATE CI samples are P5 and P8.1/PQ only.              | Same private originals                                  |
-| iPhone SDR / 1080p30 / landscape                       | Still missing from the user                                                                         | User-supplied clips                                     |
+| iPhone SDR / 1080p30 / landscape                       | Still missing. New private clips add 1080p60 HDR portrait only.                                     | User-supplied clips                                     |
 | Hardened runtime + notarized dummy app                 | `scripts/ffmpeg/sign-dummy-app.sh`                                                                  | `APPLE_DEVELOPER_ID_P12` + notary API secrets in GitHub |
 
 Until every hard P0.8 check has actually run, this ADR stays **Proposed**.

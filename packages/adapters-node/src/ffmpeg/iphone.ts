@@ -23,10 +23,11 @@ export function isIphoneMediaName(name: string): boolean {
 }
 
 /** Args after `-i <file>`. Never pass `-map 0` or `-map 0:a` (Apple `apac` is not decodable). */
-export function ffmpegMappedOutputArgs(options: { audio?: boolean } = {}): string[] {
+export function ffmpegMappedOutputArgs(options: { audio?: boolean; vfr?: boolean } = {}): string[] {
   const args = ['-map', IPHONE_VIDEO_MAP];
   if (options.audio) args.push('-map', IPHONE_AUDIO_MAP);
   else args.push('-an');
+  if (options.vfr !== false) args.push('-fps_mode', 'vfr');
   return args;
 }
 
