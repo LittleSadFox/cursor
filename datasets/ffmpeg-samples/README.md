@@ -13,6 +13,10 @@ be treated as iPhone recordings.
 
 Media files are downloaded in CI (gitignored). Hashes are in `manifest.json`.
 
+Genuine iPhone clips are **not** in this tree. Run
+`./scripts/ffmpeg/verify-iphone.sh --from-store <datasets/raw>` locally.
+Do not commit user footage.
+
 ## Gap: genuine iPhone clips
 
 iPhone HEVC/HDR and Dolby Vision (typically Profile 8.4 in a `.mov`) are not

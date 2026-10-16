@@ -98,6 +98,9 @@ if ! printf '%s\n' "$HWACCELS" | has_line videotoolbox; then
 fi
 record "encoders/decoders/filters/muxers/hwaccels listed (VT + zscale + tonemap + framemd5)"
 
+# shellcheck source=iphone-checks.sh
+source "$(scripts_ffmpeg_dir)/iphone-checks.sh"
+
 need_sample() {
   local name="$1"
   if [[ ! -f "$MEDIA/$name" ]]; then
@@ -106,45 +109,40 @@ need_sample() {
   fi
 }
 
-decode_framemd5() {
-  local label="$1" input="$2"
-  shift 2
-  local out="$WORKDIR/${label}.framemd5"
-  "$FFMPEG_BIN" -hide_banner -y "$@" -i "$input" -an -frames:v 8 -f framemd5 "$out"
-  [[ -s "$out" ]]
-  record "decode $label → framemd5 ($(wc -l <"$out") lines)"
-}
-
 need_sample h264-bbb.mp4
 need_sample hevc-bbb.mp4
 need_sample dovi-p5.mp4
 need_sample dovi-p81.mp4
 
-decode_framemd5 h264-sw "$MEDIA/h264-bbb.mp4"
-decode_framemd5 h264-skip-nokey "$MEDIA/h264-bbb.mp4" -skip_frame nokey
-decode_framemd5 hevc-sw "$MEDIA/hevc-bbb.mp4"
-decode_framemd5 dovi-p5 "$MEDIA/dovi-p5.mp4"
-decode_framemd5 dovi-p81 "$MEDIA/dovi-p81.mp4"
+decode_mapped_video h264-sw "$MEDIA/h264-bbb.mp4"
+"$FFMPEG_BIN" -hide_banner -y -skip_frame nokey -i "$MEDIA/h264-bbb.mp4" -map 0:v:0 -an \
+  -frames:v 8 -f framemd5 "$WORKDIR/h264-skip-nokey.framemd5"
+record "decode h264-skip-nokey (−skip_frame nokey, −map 0:v:0) → framemd5"
+decode_mapped_video hevc-sw "$MEDIA/hevc-bbb.mp4"
+decode_mapped_video dovi-p5 "$MEDIA/dovi-p5.mp4"
+decode_mapped_video dovi-p81 "$MEDIA/dovi-p81.mp4"
 
-"$FFMPEG_BIN" -hide_banner -y -i "$MEDIA/hevc-bbb.mp4" -an -frames:v 4 \
+"$FFMPEG_BIN" -hide_banner -y -i "$MEDIA/hevc-bbb.mp4" -map 0:v:0 -an -frames:v 4 \
   -vf 'zscale=w=160:h=90:f=bilinear,scale=160:90,format=yuv420p' \
   -f framemd5 "$WORKDIR/scale.framemd5"
 record "zscale + scale + framemd5 on public HEVC SDR"
 
-# dovi-p81 is HDR10 (bt2020 / smpte2084). Untagged SDR has no zimg colorspace path.
-"$FFMPEG_BIN" -hide_banner -y -i "$MEDIA/dovi-p81.mp4" -an -frames:v 4 \
-  -vf 'zscale=tin=smpte2084:min=bt2020nc:pin=bt2020:t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709,format=yuv420p,scale=160:90' \
-  -f framemd5 "$WORKDIR/tonemap.framemd5"
-record "zscale + tonemap + scale + framemd5 on FATE Dolby Vision P8.1 (HDR10 tags; not an iPhone clip)"
+p81_tin="$(hdr_zscale_tin "$(probe_v "$MEDIA/dovi-p81.mp4" color_transfer)")"
+if [[ -z "$p81_tin" ]]; then
+  echo "FATE dovi-p81 has no HDR transfer; cannot run tonemap" >&2
+  exit 1
+fi
+tonemap_mapped_video dovi-p81 "$MEDIA/dovi-p81.mp4" "$p81_tin"
+record "zscale + tonemap + scale on FATE dovi-p81 (probed tin=$p81_tin; not an iPhone clip)"
 
-if "$FFMPEG_BIN" -hide_banner -y -hwaccel videotoolbox -i "$MEDIA/h264-bbb.mp4" -an -frames:v 4 \
+if "$FFMPEG_BIN" -hide_banner -y -hwaccel videotoolbox -i "$MEDIA/h264-bbb.mp4" -map 0:v:0 -an -frames:v 4 \
   -f framemd5 "$WORKDIR/h264-vt.framemd5"; then
   record "H.264 VideoToolbox hwaccel decode succeeded"
 else
   soft "H.264 VideoToolbox hwaccel decode failed (common on GitHub-hosted VMs); software decode already passed"
 fi
 
-if "$FFMPEG_BIN" -hide_banner -y -hwaccel videotoolbox -i "$MEDIA/hevc-bbb.mp4" -an -frames:v 4 \
+if "$FFMPEG_BIN" -hide_banner -y -hwaccel videotoolbox -i "$MEDIA/hevc-bbb.mp4" -map 0:v:0 -an -frames:v 4 \
   -f framemd5 "$WORKDIR/hevc-vt.framemd5"; then
   record "HEVC VideoToolbox hwaccel decode succeeded"
 else
@@ -175,9 +173,7 @@ if encode_vt hevc-videotoolbox -c:v hevc_videotoolbox -allow_sw 1 \
   trc="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
     -show_entries stream=color_transfer -of csv=p=0 "$WORKDIR/hevc-videotoolbox.mp4" || true)"
   if [[ "$trc" == *smpte2084* ]]; then
-    "$FFMPEG_BIN" -hide_banner -y -i "$WORKDIR/hevc-videotoolbox.mp4" -an -frames:v 4 \
-      -vf 'zscale=tin=smpte2084:min=bt2020nc:pin=bt2020:t=linear:npl=100,tonemap=tonemap=hable,zscale=t=bt709,format=yuv420p' \
-      -f framemd5 "$WORKDIR/synthetic-hdr-tonemap.framemd5"
+    tonemap_mapped_video synthetic-vt-hevc "$WORKDIR/hevc-videotoolbox.mp4" smpte2084
     record "hevc_videotoolbox kept HDR10 tags; tonemap ran"
   else
     record "hevc_videotoolbox allow_sw=1 encoded, but macos-14 VT dropped HDR10 tags (trc=${trc:-unset}); zscale/tonemap already verified on FATE dovi-p81"
@@ -186,21 +182,8 @@ else
   soft "hevc_videotoolbox encode failed; decode/filter checks already used public HEVC"
 fi
 
-shopt -s nullglob
-iphone_clips=("$IPHONE"/*.mov "$IPHONE"/*.mp4 "$IPHONE"/*.m4v)
-shopt -u nullglob
-iphone_found=0
-for clip in "${iphone_clips[@]}"; do
-  [[ -f "$clip" ]] || continue
-  iphone_found=1
-  label="iphone-$(basename "$clip")"
-  decode_framemd5 "$label" "$clip" || {
-    echo "failed to decode user iPhone clip $clip" >&2
-    exit 1
-  }
-done
-if [[ "$iphone_found" -eq 0 ]]; then
-  record "DEFERRED: no user iPhone HEVC/HDR or Dolby Vision clips in $IPHONE (see datasets/ffmpeg-samples/iphone/README.md)"
+if ! run_iphone_clip_checks "$IPHONE"; then
+  record "CI does not have the private iPhone originals. Local: ./scripts/ffmpeg/verify-iphone.sh --from-store <datasets/raw>"
 fi
 
 record "soft failures: $SOFT_FAILS"

@@ -78,8 +78,9 @@ VideoToolbox cannot cover a required encode. That would need a new decision.
 | Dolby Vision bitstream                                 | FATE `dovi-p5.mp4` (P5) and `dovi-p81.mp4` (P8.1 + HDR10 `bt2020`/`smpte2084`). Not iPhone packing. | macos-14                                                |
 | `h264_videotoolbox` with and without `allow_sw`        | Encode `lavfi` testsrc on macos-14                                                                  | macos-14 (soft-fail `allow_sw=0` on VMs)                |
 | HEVC/H.264 **hardware** decode                         | Attempted via `-hwaccel videotoolbox`; soft-fail on hosted VMs                                      | Self-hosted M1 or user Mac                              |
-| Genuine iPhone HEVC/HDR                                | Hook: `datasets/ffmpeg-samples/iphone/`                                                             | User-supplied clips                                     |
-| Genuine iPhone Dolby Vision                            | Same hook (phone is often profile 8.4)                                                              | User-supplied clips                                     |
+| Genuine iPhone HEVC/HLG HDR                            | Local `verify-iphone.sh` (HLG `arib-std-b67` tonemap, `0:v:0`, VFR, autorotate). Not in GitHub CI.  | Opt-in Mac/Linux run against private originals          |
+| Genuine iPhone Dolby Vision 8.4                        | Same local script (profile 8.4 / HLG compat). FATE CI samples are P5 and P8.1/PQ only.              | Same private originals                                  |
+| iPhone SDR / 1080p30 / landscape                       | Still missing from the user                                                                         | User-supplied clips                                     |
 | Hardened runtime + notarized dummy app                 | `scripts/ffmpeg/sign-dummy-app.sh`                                                                  | `APPLE_DEVELOPER_ID_P12` + notary API secrets in GitHub |
 
 Until every hard P0.8 check has actually run, this ADR stays **Proposed**.
@@ -96,7 +97,12 @@ Do not mark Accepted because the scripts exist.
 ## Consequences
 
 - P1.7 video tools consume `vendor/ffmpeg/darwin-arm64` (CI artifact) through
-  `locateFfmpeg()`. They are not implemented in this slice.
+  `locateFfmpeg()`. They are not implemented in this slice. The importer must
+  map `0:v:0` and optional `0:a:0`; `-map 0` / `-map 0:a` fails on iPhone
+  `apac`. Use ffprobe `color_transfer` for `zscale` `tin=` (`arib-std-b67` or
+  `smpte2084`), keep `-fps_mode vfr`, and leave ffmpeg autorotate on for the
+  −90° portrait display matrix. Helpers: `ffmpegMappedOutputArgs` /
+  `hdrTransferFromProbe` in `@climbing-coach/adapters-node`.
 - `/health` stays `degraded` until the pose runtime (ADR-001) also ships.
   `ffmpeg.available` becomes true only for the bundled prefix or an explicit
   `COACH_FFMPEG` override, never for a Linux PATH binary.

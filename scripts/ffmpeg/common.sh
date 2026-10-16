@@ -48,6 +48,10 @@ samples_media_dir() {
 }
 
 iphone_samples_dir() {
+  if [[ -n "${IPHONE_SAMPLES_DIR:-}" ]]; then
+    printf '%s\n' "$IPHONE_SAMPLES_DIR"
+    return 0
+  fi
   printf '%s\n' "$(repo_root)/datasets/ffmpeg-samples/iphone"
 }
 

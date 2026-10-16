@@ -18,6 +18,15 @@ export {
   FORBIDDEN_FFMPEG_CONFIGURE_FLAGS,
   forbiddenConfigureFlags,
 } from './ffmpeg/forbidden-flags.js';
+export {
+  IPHONE_AUDIO_MAP,
+  IPHONE_VIDEO_MAP,
+  ffmpegMappedOutputArgs,
+  hdrTransferFromProbe,
+  isIphoneMediaName,
+  tonemapFilter,
+  type HdrTransfer,
+} from './ffmpeg/iphone.js';
 
 export {
   openSqliteLibrary,

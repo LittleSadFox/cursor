@@ -29,8 +29,19 @@ GPL/nonfree encoders).
 3. `vendor/ffmpeg/darwin-arm64/bin/{ffmpeg,ffprobe}` on darwin-arm64
 4. Linux only: `ffmpeg` / `ffprobe` on `PATH` as a non-shipping fallback
 
-## iPhone clips
+## iPhone clips (opt-in, not CI)
 
-Public samples cover H.264, HEVC SDR, and FATE Dolby Vision P5 / P8.1.
-They are **not** iPhone HEVC/HDR. Drop real clips in
-`datasets/ffmpeg-samples/iphone/` and re-run `verify.sh`.
+Public samples cover H.264, HEVC SDR, and FATE Dolby Vision P5 / P8.1 (PQ).
+They are not iPhone recordings. Genuine iPhone 16 Pro Max clips in this project
+are HEVC Main 10, HLG (`arib-std-b67`), Dolby Vision 8.4, portrait (−90°),
+~60 fps VFR, plus AAC + Apple `apac`. CI cannot see that private store.
+
+```bash
+./scripts/ffmpeg/verify-iphone.sh --from-store /path/to/datasets/raw
+```
+
+P1.7 importer must map `0:v:0` and optional `0:a:0` (AAC). `-map 0` / `-map 0:a`
+fails on `apac`. See `datasets/ffmpeg-samples/iphone/README.md`. Do not commit
+user footage without asking.
+
+Still missing: SDR (HDR off), 1080p30, landscape.
