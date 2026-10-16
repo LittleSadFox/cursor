@@ -186,4 +186,34 @@ describe('comparison routes', () => {
       .catch((error: unknown) => error);
     expect(same instanceof ProblemError && same.problem.code).toBe('VALIDATION_FAILED');
   });
+
+  it('requires the bearer token and validates pose slice ranges', async () => {
+    const { base, seed, client } = await comparisonApp();
+    const a = await seed();
+    const created = await client.comparisons.create({
+      attemptAId: a.attemptId,
+      attemptBId: (await seed()).attemptId,
+    });
+    const anonymous = [
+      fetch(`${base}/api/v1/comparisons`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attemptAId: a.attemptId, attemptBId: created.b.attemptId }),
+      }),
+      fetch(`${base}/api/v1/comparisons/${created.id}`),
+      fetch(`${base}/api/v1/comparisons/${created.id}/warp`),
+      fetch(`${base}/api/v1/comparisons/${created.id}/divergence`),
+      fetch(`${base}/api/v1/videos/${a.videoId}/pose`),
+    ];
+    for (const response of await Promise.all(anonymous)) expect(response.status).toBe(401);
+
+    const backwards = await client.videos
+      .pose(a.videoId, { fromUs: 500_000, toUs: 100_000 })
+      .catch((error: unknown) => error);
+    expect(backwards instanceof ProblemError && backwards.problem.code).toBe('VALIDATION_FAILED');
+    const outside = await client.videos
+      .pose(a.videoId, { fromUs: 60_000_000, toUs: 61_000_000 })
+      .catch((error: unknown) => error);
+    expect(outside instanceof ProblemError && outside.problem.code).toBe('NOT_FOUND');
+  });
 });
