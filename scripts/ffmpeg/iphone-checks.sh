@@ -28,6 +28,30 @@ probe_rotation() {
     -show_entries stream_tags=rotate -of default=nw=1:nk=1 "$file" 2>/dev/null | head -n 1 || true
 }
 
+# iPhone DV 8.4 lives on stream side data, not stream=dv_profile.
+probe_dv() {
+  local file="$1"
+  local profile compat
+  profile="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
+    -show_entries stream=dv_profile -of default=nw=1:nk=1 "$file" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$profile" ]]; then
+    profile="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
+      -show_entries stream_side_data=dv_profile -of default=nw=1:nk=1 "$file" 2>/dev/null | head -n 1 || true)"
+  fi
+  [[ -n "$profile" ]] || return 0
+  compat="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
+    -show_entries stream_side_data=dv_bl_signal_compatibility_id -of default=nw=1:nk=1 "$file" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$compat" ]]; then
+    compat="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
+      -show_entries stream=dv_bl_signal_compatibility_id -of default=nw=1:nk=1 "$file" 2>/dev/null | head -n 1 || true)"
+  fi
+  if [[ -n "$compat" ]]; then
+    printf '%s.%s\n' "$profile" "$compat"
+  else
+    printf '%s\n' "$profile"
+  fi
+}
+
 hdr_zscale_tin() {
   local transfer="${1:-}"
   transfer="$(printf '%s' "$transfer" | tr '[:upper:]' '[:lower:]')"
@@ -83,7 +107,7 @@ check_iphone_clip() {
   r_fps="$(probe_v "$clip" r_frame_rate || true)"
   avg_fps="$(probe_v "$clip" avg_frame_rate || true)"
   rotation="$(probe_rotation "$clip" || true)"
-  dv="$(probe_v "$clip" dv_profile || true)"
+  dv="$(probe_dv "$clip" || true)"
   tin="$(hdr_zscale_tin "$transfer")"
 
   record "iphone $base: ${width}x${height} transfer=${transfer:-unset} primaries=${primaries:-unset} matrix=${matrix:-unset} rotate=${rotation:-0} r_fps=$r_fps avg_fps=$avg_fps dv=${dv:-none}"
