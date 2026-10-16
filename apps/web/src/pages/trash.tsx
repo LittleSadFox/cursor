@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react';
 
-import { errorText, formatMessage } from '../format.js';
+import { errorText, translate } from '../format.js';
 import { useTrash, useTrashActions } from '../hooks/queries.js';
 
 export function TrashPage() {
@@ -26,9 +26,7 @@ export function TrashPage() {
               type="button"
               className="ghost"
               onClick={() => {
-                if (
-                  window.confirm(formatMessage(i18n._('trash.confirmPurge'), { title: item.title }))
-                ) {
+                if (window.confirm(translate(i18n, 'trash.confirmPurge', { title: item.title }))) {
                   actions.purge.mutate(item);
                 }
               }}

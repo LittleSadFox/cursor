@@ -1,4 +1,4 @@
-/** English catalog (Lingui). `{name}` placeholders go through `formatMessage`. */
+/** English catalog (Lingui). Messages with `{name}` placeholders go through `translate`. */
 export const messages: Record<string, string> = {
   'app.name': 'Climbing Coach',
   'nav.home': 'Home',

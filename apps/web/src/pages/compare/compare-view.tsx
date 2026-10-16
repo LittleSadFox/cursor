@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 
 import type { Comparison } from '@climbing-coach/api';
 
-import { errorText, formatMessage } from '../../format.js';
+import { errorText, translate } from '../../format.js';
 import { highlightedJoints, scoreSeries } from '../../hooks/compare/divergence.js';
 import { moveAt, moveSpans, moveViews } from '../../hooks/compare/moves.js';
 import {
@@ -157,7 +157,7 @@ function Summary({ comparison }: { comparison: Comparison }) {
     <section className="panel">
       <h2>{i18n._('compare.top')}</h2>
       <p>
-        {formatMessage(i18n._('compare.meanDivergence'), {
+        {translate(i18n, 'compare.meanDivergence', {
           value: mean === null ? null : mean.toFixed(2),
         })}
       </p>
@@ -195,7 +195,7 @@ export function CompareView(props: { attemptAId: string; attemptBId: string }) {
   if (comparison.status === 'failed') {
     return (
       <p className="error" role="alert">
-        {formatMessage(i18n._('compare.failed'), { error: comparison.error })}
+        {translate(i18n, 'compare.failed', { error: comparison.error })}
       </p>
     );
   }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import type { AlignmentVerdict } from '@climbing-coach/api';
 
-import { errorText, formatMessage } from '../../format.js';
+import { errorText, translate } from '../../format.js';
 import type { MoveSpan } from '../../hooks/compare/moves.js';
 import { useAlignmentFeedback } from '../../hooks/compare/use-compare.js';
 
@@ -61,12 +61,12 @@ export function MoveDifferencePanel(props: MovePanelProps) {
         >
           <header>
             <button type="button" className="ghost" onClick={() => props.onSeek(from)}>
-              {formatMessage(i18n._('compare.move'), { n: move.moveIndexA + 1 })}
+              {translate(i18n, 'compare.move', { n: move.moveIndexA + 1 })}
             </button>
             <small>
               {move.moveIndexB === null
                 ? i18n._('compare.noCounterpart')
-                : formatMessage(i18n._('compare.matched'), { n: move.moveIndexB + 1 })}
+                : translate(i18n, 'compare.matched', { n: move.moveIndexB + 1 })}
             </small>
           </header>
           {move.differences.length === 0 ? (
