@@ -6,7 +6,7 @@ import { REACH, STAND, landmarksFor, stillBystander } from '@climbing-coach/test
 import { createMulberry32 } from '../eval/rng.js';
 import { STARTING_PARAMS } from '../params.js';
 import { fillGaps } from './gaps.js';
-import { lowPassAlpha, oneEuroFilter, smoothStep } from './one-euro.js';
+import { lowPassAlpha, oneEuroFilter } from './one-euro.js';
 import { normalize } from './normalize.js';
 import { preprocess } from './preprocess.js';
 import { selectClimberTrack } from './select-track.js';
@@ -25,10 +25,13 @@ function sample(tUs: number, landmarks: number[][], visibility?: number): PoseSa
 }
 
 /** Independent 1€ reference (Casiez CHI 2012), written out from the paper rather than the module. */
-function referenceOneEuro(times: readonly number[], values: readonly number[]): number[] {
-  const minCutoff = 1;
-  const beta = 0;
-  const dCutoff = 1;
+function referenceOneEuro(
+  times: readonly number[],
+  values: readonly number[],
+  { minCutoff = 1, beta = 0, dCutoff = 1 } = {},
+): number[] {
+  const smooth = (alpha: number, value: number, previous: number): number =>
+    alpha * value + (1 - alpha) * previous;
   const out: number[] = [];
   let xHat = values[0] ?? 0;
   let dxHat = 0;
@@ -44,8 +47,8 @@ function referenceOneEuro(times: readonly number[], values: readonly number[]): 
       return 1 / (1 + tau / dt);
     };
     const dx = dt > 0 ? (x - prevX) / dt : 0;
-    dxHat = smoothStep(alpha(dCutoff), dx, dxHat);
-    xHat = smoothStep(alpha(minCutoff + beta * Math.abs(dxHat)), x, xHat);
+    dxHat = smooth(alpha(dCutoff), dx, dxHat);
+    xHat = smooth(alpha(minCutoff + beta * Math.abs(dxHat)), x, xHat);
     out.push(xHat);
     prevX = x;
     prevT = t;
@@ -67,6 +70,48 @@ describe('pose preprocess', () => {
     ]);
     expect(lowPassAlpha(1, 1 / 15)).toBeGreaterThan(0);
     expect(lowPassAlpha(1, 1 / 15)).toBeLessThan(1);
+  });
+
+  it('matches the reference with a speed-adaptive cutoff', () => {
+    const times = Array.from({ length: 30 }, (_, index) => index * 66_667);
+    const values = times.map((_, index) => (index < 15 ? 0.1 : 0.6) + Math.sin(index) * 0.01);
+    const params = { minCutoffHz: 1, beta: 0.5, dCutoffHz: 1 };
+    const filtered = oneEuroFilter(times, values, params);
+    const reference = referenceOneEuro(times, values, { minCutoff: 1, beta: 0.5, dCutoff: 1 });
+    filtered.forEach((value, index) => expect(value).toBeCloseTo(reference[index] ?? 0, 9));
+    const slow = oneEuroFilter(times, values, { ...params, beta: 0 });
+    expect(Math.abs((filtered[16] ?? 0) - 0.6)).toBeLessThan(Math.abs((slow[16] ?? 0) - 0.6));
+  });
+
+  it('restarts after a missing (NaN) sample instead of propagating it', () => {
+    const times = [0, 66_667, 133_334, 200_000, 266_667, 333_334];
+    const values = [Number.NaN, 0.5, 0.5, Number.NaN, 0.7, 0.7];
+    const filtered = oneEuroFilter(times, values, STARTING_PARAMS.pose.oneEuro);
+    expect(Number.isNaN(filtered[0])).toBe(true);
+    expect(filtered.slice(1, 3)).toEqual([0.5, 0.5]);
+    expect(Number.isNaN(filtered[3])).toBe(true);
+    expect(filtered.slice(4)).toEqual([0.7, 0.7]);
+  });
+
+  it('keeps a landmark finite after it was missing at the start of the track', () => {
+    const frames = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) =>
+      sample(index * 66_667, landmarksFor(STAND)),
+    );
+    for (let index = 0; index < 7; index += 1) {
+      const point = frames[index]?.landmarks[15];
+      if (point)
+        frames[index]!.landmarks[15] = {
+          ...point,
+          x: Number.NaN,
+          y: Number.NaN,
+          visibility: Number.NaN,
+        };
+    }
+    const { image } = preprocess(frames);
+    expect(Number.isNaN(image[0]?.landmarks[15]?.x)).toBe(true);
+    for (let index = 7; index < frames.length; index += 1) {
+      expect(Number.isFinite(image[index]?.landmarks[15]?.x)).toBe(true);
+    }
   });
 
   it('fills a short visibility gap and leaves a long one', () => {

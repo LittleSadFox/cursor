@@ -18,42 +18,58 @@ export function smoothStep(alpha: number, value: number, previous: number): numb
   return alpha * value + (1 - alpha) * previous;
 }
 
+type FilterState = { xHat: number; dxHat: number; prevX: number; prevT: number };
+
+function stepFilter(state: FilterState, x: number, t: number, params: OneEuroParams): number {
+  const dt = (t - state.prevT) / 1_000_000;
+  const dx = dt > 0 ? (x - state.prevX) / dt : 0;
+  state.dxHat = smoothStep(lowPassAlpha(params.dCutoffHz, dt), dx, state.dxHat);
+  const cutoff = params.minCutoffHz + params.beta * Math.abs(state.dxHat);
+  state.xHat = smoothStep(lowPassAlpha(cutoff, dt), x, state.xHat);
+  state.prevX = x;
+  state.prevT = t;
+  return state.xHat;
+}
+
+/**
+ * Filter `values` into `out`. Non-finite samples (missing landmarks are NaN) pass
+ * through unchanged and restart the filter, so a gap never poisons later frames.
+ */
+export function oneEuroInto(
+  out: { [index: number]: number; length: number },
+  tUs: ArrayLike<number>,
+  values: ArrayLike<number>,
+  params: OneEuroParams,
+): void {
+  if (tUs.length !== values.length || out.length < values.length) {
+    throw new Error('oneEuroFilter: timestamp, value, and output lengths differ');
+  }
+  let state: FilterState | null = null;
+  for (let i = 0; i < values.length; i += 1) {
+    const x = values[i] ?? Number.NaN;
+    const t = tUs[i] ?? Number.NaN;
+    if (!Number.isFinite(x) || !Number.isFinite(t)) {
+      out[i] = x;
+      state = null;
+    } else if (state === null) {
+      state = { xHat: x, dxHat: 0, prevX: x, prevT: t };
+      out[i] = x;
+    } else {
+      out[i] = stepFilter(state, x, t, params);
+    }
+  }
+}
+
 /**
  * Filter a scalar series. `tUs` must be non-decreasing.
- * The first sample is copied through.
+ * The first finite sample after the start or a gap is copied through.
  */
 export function oneEuroFilter(
   tUs: readonly number[],
   values: readonly number[],
   params: OneEuroParams,
 ): number[] {
-  if (tUs.length !== values.length) {
-    throw new Error('oneEuroFilter: timestamp and value length differ');
-  }
-  if (values.length === 0) return [];
-  const out: number[] = [];
-  const first = values[0];
-  const firstT = tUs[0];
-  if (first === undefined || firstT === undefined) return [];
-  out.push(first);
-  let xHat = first;
-  let dxHat = 0;
-  let prevX = first;
-  let prevT = firstT;
-  for (let i = 1; i < values.length; i += 1) {
-    const x = values[i];
-    const t = tUs[i];
-    if (x === undefined || t === undefined) break;
-    const dt = (t - prevT) / 1_000_000;
-    const alphaD = lowPassAlpha(params.dCutoffHz, dt);
-    const dx = dt > 0 ? (x - prevX) / dt : 0;
-    dxHat = smoothStep(alphaD, dx, dxHat);
-    const cutoff = params.minCutoffHz + params.beta * Math.abs(dxHat);
-    const alpha = lowPassAlpha(cutoff, dt);
-    xHat = smoothStep(alpha, x, xHat);
-    out.push(xHat);
-    prevX = x;
-    prevT = t;
-  }
+  const out = new Array<number>(values.length);
+  oneEuroInto(out, tUs, values, params);
   return out;
 }

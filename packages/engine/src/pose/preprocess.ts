@@ -2,16 +2,13 @@ import { STARTING_PARAMS } from '../params.js';
 import { fillGaps } from './gaps.js';
 import { filterTrack } from './filter-track.js';
 import { normalize } from './normalize.js';
+import type { OneEuroParams } from './one-euro.js';
 import type { PoseSample } from './types.js';
 
 export type PreprocessParams = {
   minVisibility: number;
   maxGapFrames: number;
-  oneEuro: {
-    minCutoffHz: number;
-    beta: number;
-    dCutoffHz: number;
-  };
+  oneEuro: OneEuroParams;
 };
 
 /**
