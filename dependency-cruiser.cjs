@@ -15,9 +15,27 @@ module.exports = {
       name: 'engine-only-schema',
       severity: 'error',
       comment: 'engine may only depend on schema.',
-      from: { path: '^packages/engine/src' },
+      from: { path: '^packages/engine/src', pathNot: '\\.test\\.ts$' },
       to: {
         path: '^packages/(?!engine|schema)',
+      },
+    },
+    {
+      name: 'engine-tests-may-use-fixtures',
+      severity: 'error',
+      comment: 'Engine tests may import synthetic fixtures. Production engine code may not.',
+      from: { path: '^packages/engine/src/.*\\.test\\.ts$' },
+      to: {
+        path: '^packages/(?!engine|schema|test-fixtures)',
+      },
+    },
+    {
+      name: 'fixtures-only-schema',
+      severity: 'error',
+      comment: 'Synthetic fixtures stay free of engine so tests do not create a package cycle.',
+      from: { path: '^packages/test-fixtures/src' },
+      to: {
+        path: '^packages/(?!test-fixtures|schema)',
       },
     },
     {

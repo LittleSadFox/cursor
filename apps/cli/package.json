@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@climbing-coach/engine": "workspace:*",
-    "@climbing-coach/schema": "workspace:*"
+    "@climbing-coach/schema": "workspace:*",
+    "@climbing-coach/test-fixtures": "workspace:*"
   },
   "devDependencies": {
     "@climbing-coach/config": "workspace:*"
