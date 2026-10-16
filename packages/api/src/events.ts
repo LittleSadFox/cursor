@@ -25,6 +25,7 @@ export const CoachEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('review.updated'), recordingId: UlidSchema, revision: z.number() }),
   z.object({ type: z.literal('attempt.created'), attemptId: UlidSchema }),
   z.object({ type: z.literal('attempt.updated'), attemptId: UlidSchema }),
+  z.object({ type: z.literal('comparison.ready'), comparisonId: UlidSchema }),
 ]);
 export type CoachEvent = z.infer<typeof CoachEventSchema> & { id?: string };
 
