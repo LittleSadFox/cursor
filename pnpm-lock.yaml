@@ -50,13 +50,13 @@ importers:
       '@climbing-coach/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
     devDependencies:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@climbing-coach/test-fixtures':
-        specifier: workspace:*
-        version: link:../../packages/test-fixtures
 
   apps/desktop: {}
 

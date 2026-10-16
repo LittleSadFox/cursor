@@ -6,6 +6,13 @@ export default [
     files: ['packages/engine/src/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'engine must not touch the DOM' },
+        { name: 'document', message: 'engine must not touch the DOM' },
+        { name: 'process', message: 'engine must not touch process' },
+        { name: 'performance', message: 'engine must not read clocks' },
+      ],
       'no-restricted-imports': [
         'error',
         {
