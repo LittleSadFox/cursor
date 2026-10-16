@@ -54,6 +54,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
 
   apps/desktop: {}
 
@@ -157,6 +160,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
 
   packages/schema:
     dependencies:
@@ -166,6 +172,16 @@ importers:
       zod-to-json-schema:
         specifier: ^3.24.5
         version: 3.25.2(zod@3.25.76)
+    devDependencies:
+      '@climbing-coach/config':
+        specifier: workspace:*
+        version: link:../config
+
+  packages/test-fixtures:
+    dependencies:
+      '@climbing-coach/schema':
+        specifier: workspace:*
+        version: link:../schema
     devDependencies:
       '@climbing-coach/config':
         specifier: workspace:*

@@ -9,18 +9,19 @@ propose auto-cuts, rate proximity + exertion, store a library, and later compare
 follow. Windows/Linux/Intel Mac are out of scope for v1.
 
 Do not invent a greenfield product. Follow the plans; if ambiguous, pick the clearest path,
-note the assumption in the PR, and keep building. Highest-leverage next work is Phase 0
-(`BUILD_PLAN` §5.2), then Track A (engine) and Track B (app) in parallel where the plan allows.
+note the assumption in the PR, and keep building. Phase 0 foundations and the Phase 1 pure engine (activity through alignment) are in
+tree. Next work is the blocked Phase 1 remainder (video tools, pose adapter, dev-split
+tuning) once a dataset and macOS ffmpeg exist, then Phase 2.
 
 ## Plans and decisions
 
-| Doc | Role |
-| --- | --- |
-| `docs/PLAN.md` | Product requirements and function design |
-| `docs/BUILD_PLAN.md` | Stack, modules, API, phases, tests, feedback loops |
-| `docs/adr/` | Architecture decisions (template: `0000-template.md`) |
-| `docs/capture-protocol.md` | Dataset capture defaults (P0.3) |
-| `datasets/manifest.json` | Dataset index only — media is private, not in git |
+| Doc                        | Role                                                  |
+| -------------------------- | ----------------------------------------------------- |
+| `docs/PLAN.md`             | Product requirements and function design              |
+| `docs/BUILD_PLAN.md`       | Stack, modules, API, phases, tests, feedback loops    |
+| `docs/adr/`                | Architecture decisions (template: `0000-template.md`) |
+| `docs/capture-protocol.md` | Dataset capture defaults (P0.3)                       |
+| `datasets/manifest.json`   | Dataset index only — media is private, not in git     |
 
 Phase IDs (P0.1, P2-A.5, …) in commits/PRs should match `BUILD_PLAN` §5.
 
@@ -29,13 +30,14 @@ Phase IDs (P0.1, P2-A.5, …) in commits/PRs should match `BUILD_PLAN` §5.
 ```
 apps/web          React + Vite renderer (browser dev; later Electron)
 apps/server       Fastify local API (127.0.0.1)
-apps/cli          `coach` CLI (eval/process arrive in P1)
+apps/cli          `coach` CLI: eval, detect, align, cut --draft, bench; video process waits on ffmpeg
 apps/desktop      Electron packaging placeholder (P2)
 packages/schema   Types, Zod, posebin/signals/labels (no deps but Zod)
 packages/engine   Pure algorithms — no I/O, no Node/DOM, no clocks/IDs
 packages/api      DTOs, CoachApi contract
 packages/core     Use cases, DB, jobs (no HTTP/Electron/React)
 packages/config   Shared tsconfig / ESLint / Vitest presets
+packages/test-fixtures  Synthetic climber and activity frames (no engine import)
 research/pose-lab Python bake-off + posebin round-trip (not a pnpm package)
 ```
 
@@ -56,18 +58,18 @@ pnpm build
 
 ## Commands
 
-| Task | Command |
-| --- | --- |
-| Build all | `pnpm build` |
-| Lint | `pnpm lint` |
-| Typecheck | `pnpm typecheck` |
-| Unit tests | `pnpm test` |
-| Module boundaries | `pnpm deps:check` |
-| Full local check | `pnpm verify` |
-| Web UI | `pnpm --filter @climbing-coach/web dev` |
-| API server | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` |
-| Schema only | `pnpm --filter @climbing-coach/schema test` |
-| Python posebin | `python3 -m pytest research/pose-lab/tests -q` |
+| Task              | Command                                                           |
+| ----------------- | ----------------------------------------------------------------- |
+| Build all         | `pnpm build`                                                      |
+| Lint              | `pnpm lint`                                                       |
+| Typecheck         | `pnpm typecheck`                                                  |
+| Unit tests        | `pnpm test`                                                       |
+| Module boundaries | `pnpm deps:check`                                                 |
+| Full local check  | `pnpm verify`                                                     |
+| Web UI            | `pnpm --filter @climbing-coach/web dev`                           |
+| API server        | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` |
+| Schema only       | `pnpm --filter @climbing-coach/schema test`                       |
+| Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                    |
 
 CI: `.github/workflows/ci.yml` (Linux lint/typecheck/test/deps + Python posebin; macOS arm64
 schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
@@ -93,11 +95,14 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## What exists today vs later
 
-**In tree now:** monorepo scaffolding (P0.1), schema **v1.0.0** (posebin/signals/labels/
-feature spec/dataset manifest + JSON Schema export), synthetic `coach eval` (P0.7 start),
-label-tool stub (P0.4), capture protocol + consent template (P0.3 docs), proposed ADR-001 /
-ADR-002, stub `engine`/`api`/`core`/`adapters-node`, minimal web shell + Fastify `/health`.
+**In tree now:** monorepo scaffolding (P0.1), schema **v1.0.0**, synthetic `coach eval`
+(P0.7), label-tool stub (P0.4), capture protocol (P0.3 docs), proposed ADR-001 / ADR-002.
+Phase 1 pure engine (P1.1–P1.6) at `engine` 0.1.0: activity, pose preprocess, frame features
+(`FEATURE_SPEC` 0.1.0), attempt detection, review-draft cut ops, moves, alignment. Synthetic
+climber fixtures (P1.9, no fixture videos). CLI `detect` / `align` / `cut --draft` / `bench`
+(P1.10). `coach process` and video `cut` exit 2 until ffmpeg exists.
 
-**Blocked / not built yet:** real dataset media (P0.3), pose bake-off (P0.5–P0.6), shipped
-ffmpeg (P0.8), ingest/review UI, Electron packaging, comparison, mobile. Implement those only
-when the matching phase item says so and prerequisites exist.
+**Blocked / not built yet:** real dataset media (P0.3, P1.11 tuning), pose bake-off and the
+pose adapter (P0.5–P0.6, P1.8), shipped ffmpeg and video tools (P0.8, P1.7), ingest/review UI,
+Electron packaging, comparison UI, mobile. Implement those only when the matching phase item
+says so and prerequisites exist.
