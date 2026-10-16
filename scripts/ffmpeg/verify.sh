@@ -127,9 +127,15 @@ decode_framemd5 dovi-p5 "$MEDIA/dovi-p5.mp4"
 decode_framemd5 dovi-p81 "$MEDIA/dovi-p81.mp4"
 
 "$FFMPEG_BIN" -hide_banner -y -i "$MEDIA/hevc-bbb.mp4" -an -frames:v 4 \
-  -vf 'zscale=t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709,format=yuv420p,scale=160:90' \
+  -vf 'zscale=w=160:h=90:f=bilinear,scale=160:90,format=yuv420p' \
+  -f framemd5 "$WORKDIR/scale.framemd5"
+record "zscale + scale + framemd5 on public HEVC SDR"
+
+# dovi-p81 is HDR10 (bt2020 / smpte2084). Untagged SDR has no zimg colorspace path.
+"$FFMPEG_BIN" -hide_banner -y -i "$MEDIA/dovi-p81.mp4" -an -frames:v 4 \
+  -vf 'zscale=tin=smpte2084:min=bt2020nc:pin=bt2020:t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709,format=yuv420p,scale=160:90' \
   -f framemd5 "$WORKDIR/tonemap.framemd5"
-record "zscale + tonemap + scale + framemd5 on public HEVC SDR (synthetic HDR graph; not iPhone HDR)"
+record "zscale + tonemap + scale + framemd5 on FATE Dolby Vision P8.1 (HDR10 tags; not an iPhone clip)"
 
 if "$FFMPEG_BIN" -hide_banner -y -hwaccel videotoolbox -i "$MEDIA/h264-bbb.mp4" -an -frames:v 4 \
   -f framemd5 "$WORKDIR/h264-vt.framemd5"; then
