@@ -39,3 +39,4 @@ export {
   writeLibraryPointer,
 } from './paths.js';
 export { nodeRandomBytes } from './random.js';
+export { libraryBlobs } from './blobs.js';

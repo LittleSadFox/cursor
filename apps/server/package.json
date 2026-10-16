@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@climbing-coach/config": "workspace:*",
+    "@climbing-coach/test-fixtures": "workspace:*",
     "tsx": "^4.19.3"
   }
 }

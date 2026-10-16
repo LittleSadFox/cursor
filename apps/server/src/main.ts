@@ -5,6 +5,7 @@ import {
   appConfigDir,
   backupsDir,
   defaultLibraryRoot,
+  libraryBlobs,
   libraryDbPath,
   nodeRandomBytes,
   openSqliteLibrary,
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
     events,
     logger: consoleLogger,
     backup: opened.backup,
+    blobs: libraryBlobs(libraryRoot),
     ffmpegAvailable: false,
     poseAvailable: false,
     onLibraryRootChange: (root) => {
