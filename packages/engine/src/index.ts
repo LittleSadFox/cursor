@@ -31,6 +31,7 @@ export { fillGaps, type GapFillParams } from './pose/gaps.js';
 export { normalize } from './pose/normalize.js';
 export { bodyMetrics, estimateBodyHeight, type BodyMetrics } from './pose/metrics.js';
 export { preprocess, type PreprocessParams } from './pose/preprocess.js';
+export { trackSamples } from './pose/from-track.js';
 
 export { FEATURE_SPEC, FEATURE_SPEC_VERSION, FEATURE_NAMES } from './features/spec.js';
 export {
@@ -86,6 +87,12 @@ export { bandedDtw, openEndDtw, type DtwResult, type DtwStep } from './align/dtw
 export { reduceFeatures } from './align/pca.js';
 export { align, type AlignFrame, type AlignOptions, type AlignResult } from './align/align.js';
 export { alignFrames } from './align/frames.js';
+export {
+  alignAttempts,
+  openEndSide,
+  type AttemptAlignOptions,
+  type OpenEndSide,
+} from './align/attempts.js';
 
 export {
   CHANNEL_COUNT,

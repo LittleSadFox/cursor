@@ -21,6 +21,6 @@ describe('exportJsonSchemas', () => {
   });
 
   it('is schema v1', () => {
-    expect(SCHEMA_VERSION).toBe('1.0.0');
+    expect(SCHEMA_VERSION).toBe('1.1.0');
   });
 });

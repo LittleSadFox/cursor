@@ -1,5 +1,12 @@
 # @climbing-coach/schema
 
+## 1.1.0 — comparison bin (P3.2)
+
+- `writeComparisonBin` / `readComparisonBin`: `comparisons/<id>.bin` with Int32 warp times
+  `[steps × 2]` (clip microseconds of A and B) and Float32 divergence `[steps × channels]`.
+  Additive; posebin v1 and the label formats are unchanged.
+- `slicePoseTrack`: a time slice of a pose track, for `GET /videos/:id/pose?fromUs&toUs`.
+
 ## 1.0.0 — schema v1 (P0.2)
 
 Tagged contract for Phase 0:

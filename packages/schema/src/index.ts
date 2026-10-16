@@ -34,6 +34,14 @@ export {
 } from './pose-track.js';
 
 export { writePosebin, readPosebin, POSEBIN_FORMAT_VERSION } from './posebin.js';
+export { slicePoseTrack } from './pose-slice.js';
+
+export {
+  writeComparisonBin,
+  readComparisonBin,
+  COMPARISON_BIN_FORMAT_VERSION,
+  type ComparisonBin,
+} from './comparison-bin.js';
 
 export {
   RecordingWarningSchema,
@@ -107,5 +115,5 @@ export { sha256Hex } from './sha256.js';
 
 export { exportJsonSchemas } from './json-schema.js';
 
-/** Schema package semver; derived data should record this. Tagged schema v1. */
-export const SCHEMA_VERSION = '1.0.0';
+/** Schema package semver; derived data should record this. 1.1.0 adds the comparison bin. */
+export const SCHEMA_VERSION = '1.1.0';
