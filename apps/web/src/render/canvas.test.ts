@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { paint, type Canvas2D } from './canvas.js';
+import { backingScale, backingSize, paint, type Canvas2D } from './canvas.js';
 
 function recorder(): Canvas2D & { calls: string[] } {
   const calls: string[] = [];
@@ -11,6 +11,7 @@ function recorder(): Canvas2D & { calls: string[] } {
     };
   return {
     calls,
+    setTransform: log('setTransform'),
     clearRect: log('clearRect'),
     beginPath: log('beginPath'),
     moveTo: log('moveTo'),
@@ -38,6 +39,7 @@ describe('paint', () => {
       { width: 10, height: 20 },
     );
     expect(ctx.calls).toEqual([
+      'setTransform(1,0,0,1,0,0)',
       'clearRect(0,0,10,20)',
       'beginPath()',
       'moveTo(0,1)',
@@ -50,5 +52,20 @@ describe('paint', () => {
     expect(ctx.fillStyle).toBe('#f00');
     expect(ctx.lineWidth).toBe(4);
     expect(ctx.globalAlpha).toBe(1);
+  });
+
+  it('scales CSS-pixel commands onto a high-DPI backing store', () => {
+    const ctx = recorder();
+    paint(ctx, [], { width: 10, height: 20 }, 2);
+    expect(ctx.calls).toEqual(['setTransform(2,0,0,2,0,0)', 'clearRect(0,0,10,20)']);
+  });
+});
+
+describe('backing store', () => {
+  it('uses the device pixel ratio, never below 1×', () => {
+    expect(backingScale(2)).toBe(2);
+    expect(backingScale(0.5)).toBe(1);
+    expect(backingScale(Number.NaN)).toBe(1);
+    expect(backingSize({ width: 270, height: 480 }, 1.5)).toEqual({ width: 405, height: 720 });
   });
 });
