@@ -12,6 +12,6 @@ declare const process: { env: Record<string, string | undefined> };
 export function desktopBridgeFromEnv(): DesktopBridge {
   return {
     port: Number(process.env.PORT ?? 8787),
-    token: process.env.COACH_TOKEN ?? 'dev-token',
+    token: process.env.COACH_TOKEN ?? '',
   };
 }

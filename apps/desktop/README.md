@@ -10,8 +10,11 @@ still blocked on ADR-002 and a Mac.
 To run the shell on a Mac once Electron is installed:
 
 ```bash
-COACH_TOKEN=dev-token pnpm --filter @climbing-coach/server build
+pnpm --filter @climbing-coach/server build
 pnpm --filter @climbing-coach/web build
 pnpm --filter @climbing-coach/desktop build
 npx electron apps/desktop/dist/main.js
 ```
+
+The shell generates a per-launch token, passes it to the server in `COACH_TOKEN`, and (P2-D)
+hands it to the renderer through the preload bridge.

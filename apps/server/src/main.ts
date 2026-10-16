@@ -1,15 +1,50 @@
 import { randomBytes } from 'node:crypto';
 
 import { API_VERSION } from '@climbing-coach/api';
-import { defaultLibraryRoot, libraryDbPath, nodeRandomBytes, openSqliteLibrary } from '@climbing-coach/adapters-node';
-import { createCoreApi, createEventBus, createIdGen, systemClock } from '@climbing-coach/core';
+import {
+  appConfigDir,
+  backupsDir,
+  defaultLibraryRoot,
+  libraryDbPath,
+  nodeRandomBytes,
+  openSqliteLibrary,
+  readLibraryPointer,
+  writeLibraryPointer,
+} from '@climbing-coach/adapters-node';
+import {
+  createCoreApi,
+  createEventBus,
+  createIdGen,
+  systemClock,
+  type Logger,
+} from '@climbing-coach/core';
 
-import { createApp, DEV_ORIGINS } from './create-app.js';
+import { launchConfig, resolveLibraryRoot } from './config.js';
+import { createApp } from './create-app.js';
+import { startScheduler } from './scheduler.js';
+
+const consoleLogger: Logger = {
+  info: (fields, message) => console.log(JSON.stringify({ level: 'info', message, ...fields })),
+  warn: (fields, message) => console.warn(JSON.stringify({ level: 'warn', message, ...fields })),
+  error: (fields, message) => console.error(JSON.stringify({ level: 'error', message, ...fields })),
+};
 
 async function main(): Promise<void> {
+  const config = launchConfig(process.env, (bytes) => randomBytes(bytes).toString('hex'));
   const clock = systemClock();
-  const libraryRoot = process.env.COACH_LIBRARY ?? defaultLibraryRoot();
-  const opened = openSqliteLibrary(libraryDbPath(libraryRoot), clock.nowIso());
+  const configDir = process.env.COACH_CONFIG_DIR || appConfigDir();
+  const libraryRoot = resolveLibraryRoot(
+    process.env,
+    readLibraryPointer(configDir),
+    defaultLibraryRoot(),
+  );
+  const opened = openSqliteLibrary(libraryDbPath(libraryRoot), clock.nowIso(), {
+    backupsDir: backupsDir(libraryRoot),
+  });
+  if (opened.preMigrationBackup)
+    consoleLogger.info({ path: opened.preMigrationBackup }, 'pre-migration backup');
+
+  let persistLibraryRoot = false;
   const events = createEventBus(() => clock.nowMs());
   const api = createCoreApi({
     db: opened.db,
@@ -17,50 +52,51 @@ async function main(): Promise<void> {
     clock,
     ids: createIdGen(clock, nodeRandomBytes),
     events,
-    logger: {
-      info: (fields, message) => {
-        console.log(JSON.stringify({ level: 'info', message, ...fields }));
-      },
-      warn: (fields, message) => {
-        console.warn(JSON.stringify({ level: 'warn', message, ...fields }));
-      },
-      error: (fields, message) => {
-        console.error(JSON.stringify({ level: 'error', message, ...fields }));
-      },
-    },
+    logger: consoleLogger,
     backup: opened.backup,
     ffmpegAvailable: false,
     poseAvailable: false,
+    onLibraryRootChange: (root) => {
+      if (persistLibraryRoot) writeLibraryPointer(configDir, root);
+    },
   });
 
-  const current = await api.system.getSettings();
-  if (current.libraryRoot === null) {
+  // Settings reflect the library actually open; a COACH_LIBRARY override is not persisted.
+  if ((await api.system.getSettings()).libraryRoot !== libraryRoot) {
     await api.system.updateSettings({ libraryRoot });
   }
-
-  const token = process.env.COACH_TOKEN ?? 'dev-token';
-  const mediaSecret = process.env.COACH_MEDIA_SECRET ?? randomBytes(32).toString('hex');
-  const extraOrigin = process.env.COACH_DEV_ORIGIN;
-  const origins = extraOrigin ? [...DEV_ORIGINS, extraOrigin] : [...DEV_ORIGINS];
+  persistLibraryRoot = true;
 
   const app = await createApp({
     api,
     events,
-    token,
-    allowedOrigins: origins,
-    mediaSecret,
+    token: config.token,
+    allowedOrigins: config.allowedOrigins,
+    mediaSecret: config.mediaSecret,
     libraryRoot,
     logger: true,
   });
+  const stopScheduler = startScheduler(api.jobsRunner, consoleLogger);
+  app.addHook('onClose', async () => {
+    stopScheduler();
+    opened.close();
+  });
 
-  const port = Number(process.env.PORT ?? 8787);
-  await app.listen({ host: '127.0.0.1', port });
+  await app.listen({ host: '127.0.0.1', port: config.port });
   app.log.info(
-    { apiVersion: API_VERSION, port, libraryRoot, tokenSet: Boolean(process.env.COACH_TOKEN) },
+    {
+      apiVersion: API_VERSION,
+      port: config.port,
+      libraryRoot,
+      dev: config.dev,
+      tokenSource: config.tokenSource,
+    },
     'climbing-coach server listening',
   );
-  if (!process.env.COACH_TOKEN) {
-    app.log.info('using default launch token "dev-token" (set COACH_TOKEN to override)');
+  if (config.tokenSource === 'random') {
+    app.log.warn(
+      'no COACH_TOKEN given: generated a per-launch token; set COACH_DEV=1 for the dev token',
+    );
   }
 }
 

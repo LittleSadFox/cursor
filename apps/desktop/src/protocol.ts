@@ -22,7 +22,8 @@ export function resolveAppRequest(requestUrl: string, rendererRoot: string): str
   }
   if (parsed.protocol !== `${APP_PROTOCOL}:`) return null;
   if (parsed.hostname !== '-' && parsed.hostname !== '') return null;
-  const rawPath = parsed.pathname === '/' || parsed.pathname === '' ? '/index.html' : parsed.pathname;
+  const rawPath =
+    parsed.pathname === '/' || parsed.pathname === '' ? '/index.html' : parsed.pathname;
   const relative = posix.normalize(rawPath).replace(/^\/+/, '');
   const root = rendererRoot.replaceAll('\\', '/');
   const candidate = posix.join(root, relative);

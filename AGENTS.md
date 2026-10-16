@@ -66,8 +66,8 @@ pnpm build
 | Unit tests        | `pnpm test`                                                       |
 | Module boundaries | `pnpm deps:check`                                                 |
 | Full local check  | `pnpm verify`                                                     |
-| Web UI            | `VITE_COACH_TOKEN=dev-token pnpm --filter @climbing-coach/web dev` |
-| API server        | `COACH_TOKEN=dev-token pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` |
+| Web UI            | `pnpm --filter @climbing-coach/web dev` |
+| API server        | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` (dev token `dev-token`) |
 | Schema only       | `pnpm --filter @climbing-coach/schema test`                       |
 | Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                    |
 

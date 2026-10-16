@@ -26,11 +26,15 @@ Requires Node 22+ and pnpm 10+.
 pnpm install
 pnpm build
 pnpm verify
-COACH_TOKEN=dev-token pnpm --filter @climbing-coach/server dev
-VITE_COACH_TOKEN=dev-token pnpm --filter @climbing-coach/web dev
+pnpm --filter @climbing-coach/server dev   # COACH_DEV=1: fixed dev-token + Vite origins
+pnpm --filter @climbing-coach/web dev      # sends dev-token unless VITE_COACH_TOKEN is set
 pnpm --filter @climbing-coach/cli exec node dist/main.js eval \
   --fixture datasets/fixtures/eval/baseline-synthetic.json
 ```
+
+Outside `COACH_DEV=1` the server generates a random per-launch token (the desktop shell passes
+its own in `COACH_TOKEN`) and only accepts the `app://-` origin. Set `COACH_LIBRARY` to point at
+a scratch library while developing.
 
 Useful scripts: `pnpm lint`, `pnpm typecheck`, `pnpm deps:check`, `pnpm verify`.
 

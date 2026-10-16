@@ -4,6 +4,7 @@
  * 127.0.0.1. Linux CI tests protocol.ts and menu.ts without launching Electron.
  */
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,7 +22,10 @@ export type ElectronLike = {
   Menu: { buildFromTemplate: (t: unknown) => unknown; setApplicationMenu: (m: unknown) => void };
   protocol: {
     registerSchemesAsPrivileged?: (s: unknown) => void;
-    handle: (scheme: string, handler: (req: { url: string }) => Promise<Response> | Response) => void;
+    handle: (
+      scheme: string,
+      handler: (req: { url: string }) => Promise<Response> | Response,
+    ) => void;
   };
 };
 
@@ -40,7 +44,9 @@ export async function startDesktop(electron: ElectronLike, rendererRoot: string)
     return fetch(pathToFileURL(filePath));
   });
 
-  const token = process.env.COACH_TOKEN ?? 'dev-token';
+  // Per-launch secret shared with the server; the preload hands it to the renderer (P2-D).
+  const token = process.env.COACH_TOKEN || randomBytes(32).toString('hex');
+  process.env.COACH_TOKEN = token;
   const port = process.env.PORT ?? '8787';
   spawn(process.execPath, [join(here, '../../server/dist/main.js')], {
     env: { ...process.env, COACH_TOKEN: token, PORT: port },

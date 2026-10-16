@@ -102,7 +102,13 @@ export {
   type WeeklySummary,
   type GradeCount,
 } from './stats.js';
-export { TrashKindSchema, TrashItemSchema, type TrashKind, type TrashItem } from './trash.js';
+export {
+  TrashKindSchema,
+  TrashItemSchema,
+  TrashRestoreSchema,
+  type TrashKind,
+  type TrashItem,
+} from './trash.js';
 export {
   JobSchema,
   JobStatusSchema,
