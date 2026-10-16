@@ -53,6 +53,10 @@ export function createSystemService(deps: SystemDeps): CoachApi['system'] {
       return toSettings(readSettings(deps.db));
     },
     async updateSettings(patch) {
+      // v1 is macOS-only: a library path is POSIX and absolute (no `~`, nothing CWD-relative).
+      if (patch.libraryRoot && !patch.libraryRoot.startsWith('/')) {
+        throw new ProblemError('VALIDATION_FAILED', 'Library folder must be an absolute path.');
+      }
       if (patch.libraryRoot && isSyncFolder(patch.libraryRoot)) {
         throw new ProblemError(
           'VALIDATION_FAILED',

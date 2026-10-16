@@ -38,6 +38,13 @@ describe('CoachApi (in-process)', () => {
     ).rejects.toBeInstanceOf(ProblemError);
   });
 
+  it('refuses a relative or ~ library root', async () => {
+    const { api } = createTestApi();
+    for (const libraryRoot of ['~/Movies/Climbing Coach Library', 'library']) {
+      await expect(api.system.updateSettings({ libraryRoot })).rejects.toBeInstanceOf(ProblemError);
+    }
+  });
+
   it('soft-deletes a training log and restores it', async () => {
     const { api } = createTestApi();
     await api.trainingLogs.put('2026-10-16', {
