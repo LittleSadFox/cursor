@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PoseBuilder, REACH, STAND, type RawSample } from '@climbing-coach/test-fixtures';
 
 import { align } from '../align/align.js';
+import { alignAttempts } from '../align/attempts.js';
 import { alignFrames } from '../align/frames.js';
 import { LANDMARK_INDEX } from '../pose/access.js';
 import type { PoseSample, XyzV } from '../pose/types.js';
@@ -10,6 +11,8 @@ import { segmentMoves } from '../moves/segment.js';
 import { CHANNEL_COUNT, COMPARE_JOINTS, DIVERGENCE_CHANNELS } from './channels.js';
 import { comparePostures } from './compare.js';
 import { describeDifference } from './describe.js';
+import { counterpartOf, mappedSpanB } from './matches.js';
+import { compareSideOf } from './side.js';
 import {
   divergenceScore,
   highlightedJoints,
@@ -253,6 +256,88 @@ describe('comparePostures', () => {
     const reported = result.perMove.flatMap((move) => move.differences);
     expect(reported.length).toBeGreaterThan(0);
     expect(reported.every((difference) => difference.joint === 'rightKnee')).toBe(true);
+  });
+});
+
+describe('move matches and per-move summaries', () => {
+  const HIGH = { ...REACH, wristY: -0.15, leftWristY: 0.02 };
+  const HIGHER = { ...REACH, wristY: -0.3, leftWristY: -0.1 };
+
+  /** Step on with all four limbs at once, then two single reaches, holding after each. */
+  function threeMoves(): PoseSample[] {
+    const builder = new PoseBuilder();
+    builder.hold(STAND, 1);
+    builder.ramp(STAND, REACH, 1);
+    builder.hold(REACH, 1);
+    builder.ramp(REACH, HIGH, 0.6);
+    builder.hold(HIGH, 1);
+    builder.ramp(HIGH, HIGHER, 0.6);
+    builder.hold(HIGHER, 1);
+    return builder.samples.map(toSample);
+  }
+
+  function wholeRange(samples: readonly PoseSample[]) {
+    return { startUs: samples[0]?.tUs ?? 0, endUs: (samples[samples.length - 1]?.tUs ?? 0) + 1 };
+  }
+
+  function compareOpenEnd(a: PoseSample[], b: PoseSample[]) {
+    const sideA = compareSideOf(a, wholeRange(a));
+    const sideB = compareSideOf(b, wholeRange(b));
+    return {
+      sideA,
+      sideB,
+      result: comparePostures(sideA, sideB, alignAttempts(a, b, { openEnd: 'b' })),
+    };
+  }
+
+  it('marks moves past an open-ended fall as having no counterpart', () => {
+    const top = threeMoves();
+    const fall = top.filter((sample) => sample.tUs < 4_200_000);
+    const { sideA, sideB, result } = compareOpenEnd(top, fall);
+    expect(sideB.moves.length).toBeLessThan(sideA.moves.length);
+    for (const match of result.moveMatches) {
+      const move = sideA.moves.find((item) => item.index === match.a);
+      if ((move?.startUs ?? 0) < 4_200_000) expect(match.b).toBe(match.a);
+      else expect(match.b).toBeNull();
+    }
+    expect(result.moveMatches.some((match) => match.b === null)).toBe(true);
+  });
+
+  it('counts warp steps for every limb moving at the same time', () => {
+    const climb = threeMoves();
+    const { sideA, result } = compareOpenEnd(climb, climb);
+    const firstStart = sideA.moves[0]?.startUs;
+    const simultaneous = result.perMove.filter(
+      (move) => sideA.moves.find((item) => item.index === move.moveIndexA)?.startUs === firstStart,
+    );
+    expect(simultaneous.length).toBeGreaterThan(1);
+    expect(simultaneous.every((move) => move.steps > 0 && move.meanScore === 0)).toBe(true);
+  });
+
+  it('reports each joint once in the top differences', () => {
+    const a = threeMoves();
+    const b = a.map((sample) => closeRightKnee(sample, 15));
+    const { result } = compareOpenEnd(a, b);
+    const reported = result.perMove.filter((move) => move.differences.length > 0);
+    expect(reported.length).toBeGreaterThan(1);
+    expect(result.summary.topDifferences.map((d) => d.joint)).toEqual(['rightKnee']);
+  });
+
+  it('pairs a move with the same-limb move of B the warp maps it onto', () => {
+    const moves = [
+      { index: 0, limb: 'rightWrist' as const, startUs: 0, endUs: 100 },
+      { index: 1, limb: 'leftWrist' as const, startUs: 100, endUs: 200 },
+    ];
+    const span = mappedSpanB(
+      Int32Array.from([0, 0, 1, 2, 2, 3]),
+      Float64Array.from([0, 50, 150]),
+      Float64Array.from([0, 40, 120, 160]),
+      { startUs: 0, endUs: 100 },
+    );
+    expect(span).toEqual({ startUs: 0, endUs: 120 });
+    expect(counterpartOf('rightWrist', { startUs: 30, endUs: 30 }, moves)?.index).toBe(0);
+    expect(counterpartOf('rightWrist', { startUs: 150, endUs: 180 }, moves)).toBeNull();
+    expect(counterpartOf('leftWrist', { startUs: 90, endUs: 150 }, moves)?.index).toBe(1);
   });
 });
 

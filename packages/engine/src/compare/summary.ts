@@ -20,11 +20,9 @@ export type ComparisonSummary = {
   topDifferences: Difference[];
 };
 
-function moveIndexAt(moves: readonly MoveSegment[], tUs: number): number {
-  for (const move of moves) {
-    if (tUs >= move.startUs && tUs < move.endUs) return move.index;
-  }
-  return -1;
+/** Every move of A in progress at `tUs`; different limbs can move at once. */
+function movesAt(moves: readonly MoveSegment[], tUs: number): MoveSegment[] {
+  return moves.filter((move) => tUs >= move.startUs && tUs < move.endUs);
 }
 
 type Accumulator = {
@@ -72,8 +70,10 @@ export function summarizeByMove(
   );
   for (let step = 0; step < series.score.length; step += 1) {
     const frame = warp[step * 2] ?? -1;
-    const acc = byMove.get(moveIndexAt(movesA, tUsA[frame] ?? Number.NaN));
-    if (acc) addStep(acc, series, step);
+    for (const move of movesAt(movesA, tUsA[frame] ?? Number.NaN)) {
+      const acc = byMove.get(move.index);
+      if (acc) addStep(acc, series, step);
+    }
   }
   return movesA.map((move) => {
     const acc = byMove.get(move.index) ?? emptyAccumulator();
@@ -127,12 +127,22 @@ export function moveDifferences(
   return weightedFacts(move, params).sort(byWeight).map(described);
 }
 
-/** Largest per-move differences above the reporting minimum, with English text. */
+/** Each channel's largest difference only, so one steady offset does not fill the list. */
+function strongestPerChannel(facts: readonly WeightedFacts[]): WeightedFacts[] {
+  const best = new Map<string, WeightedFacts>();
+  for (const fact of facts) {
+    const current = best.get(fact.joint);
+    if (!current || byWeight(fact, current) < 0) best.set(fact.joint, fact);
+  }
+  return [...best.values()];
+}
+
+/** Largest per-move differences above the reporting minimum, one per channel, with text. */
 export function topDifferences(
   moves: readonly MoveSummary[],
   params: CompareParams = STARTING_PARAMS.compare,
 ): Difference[] {
-  const candidates = moves.flatMap((move) => weightedFacts(move, params));
+  const candidates = strongestPerChannel(moves.flatMap((move) => weightedFacts(move, params)));
   return candidates.sort(byWeight).slice(0, params.topDifferences).map(described);
 }
 

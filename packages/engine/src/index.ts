@@ -139,13 +139,19 @@ export {
   type MoveSummary,
 } from './compare/summary.js';
 export {
+  counterpartOf,
+  mappedSpanB,
+  warpMoveMatches,
+  type MoveMatch,
+  type Span,
+} from './compare/matches.js';
+export {
   comparePostures,
-  moveMatchesOf,
   type CompareSide,
   type ComparisonResult,
-  type MoveMatch,
   type MoveResult,
 } from './compare/compare.js';
+export { compareSideOf, type BuiltSide } from './compare/side.js';
 
 export {
   GRADE_SYSTEMS,

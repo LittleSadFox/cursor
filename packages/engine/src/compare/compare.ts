@@ -1,5 +1,4 @@
 import type { AlignResult } from '../align/align.js';
-import { matchMoves } from '../align/nw.js';
 import type { MoveSegment, StationaryPeriod } from '../moves/segment.js';
 import type { PoseSample } from '../pose/types.js';
 import { STARTING_PARAMS } from '../params.js';
@@ -10,6 +9,7 @@ import {
   type CompareParams,
   type PostureRows,
 } from './divergence.js';
+import { warpMoveMatches, type MoveMatch } from './matches.js';
 import {
   meanFinite,
   moveDifferences,
@@ -28,7 +28,7 @@ export type CompareSide = {
   contacts?: readonly StationaryPeriod[];
 };
 
-export type MoveMatch = { a: number; b: number | null; cost?: number };
+export type { MoveMatch };
 
 export type MoveResult = MoveSummary & { differences: Difference[] };
 
@@ -49,24 +49,6 @@ function rowsFor(side: CompareSide): PostureRows {
   return postureRows(side.samples, periods ? (tUs) => contactsAt(tUs, periods) : undefined);
 }
 
-/** Move pairs from Needleman–Wunsch; `cost` is A's mean divergence over that move. */
-export function moveMatchesOf(
-  movesA: readonly MoveSegment[],
-  movesB: readonly MoveSegment[],
-  perMove: readonly MoveSummary[],
-): MoveMatch[] {
-  const pairs = new Map(matchMoves(movesA, movesB).map((pair) => [pair.aIndex, pair.bIndex]));
-  return movesA.map((move, position) => {
-    const bPosition = pairs.get(position);
-    const b = bPosition === undefined ? undefined : movesB[bPosition];
-    if (!b) return { a: move.index, b: null };
-    const cost = perMove[position]?.meanScore ?? Number.NaN;
-    return Number.isFinite(cost)
-      ? { a: move.index, b: b.index, cost }
-      : { a: move.index, b: b.index };
-  });
-}
-
 /** Posture comparison along an alignment (PLAN 2.8, BUILD_PLAN `comparePostures`). */
 export function comparePostures(
   a: CompareSide,
@@ -79,11 +61,12 @@ export function comparePostures(
   const warp = warpIndices(alignment.path, rowsA.tUs, rowsB.tUs);
   const series = divergenceSeries(rowsA, rowsB, warp, params);
   const perMove = summarizeByMove(series, warp, rowsA.tUs, a.moves);
+  const indexed = { indices: warp, tUsA: rowsA.tUs, tUsB: rowsB.tUs };
   return {
     warp,
     deltas: series.deltas,
     score: series.score,
-    moveMatches: moveMatchesOf(a.moves, b.moves, perMove),
+    moveMatches: warpMoveMatches(a.moves, b.moves, indexed, perMove),
     perMove: perMove.map((move) => ({ ...move, differences: moveDifferences(move, params) })),
     summary: {
       meanDivergence: meanFinite(series.score),
