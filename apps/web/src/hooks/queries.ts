@@ -57,6 +57,10 @@ export function useSaveToday(date = localDate()) {
     onSuccess: async () => {
       await client.invalidateQueries();
     },
+    // A version conflict means another writer won; reload the day so the form shows it.
+    onError: async () => {
+      await client.invalidateQueries({ queryKey: ['training-log', date] });
+    },
   });
 }
 

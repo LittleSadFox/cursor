@@ -1,80 +1,112 @@
 import { useLingui } from '@lingui/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
+import type { Settings } from '@climbing-coach/api';
+
+import { errorText } from '../format.js';
 import { useSaveSettings, useSettings } from '../hooks/queries.js';
+import {
+  GRADE_SYSTEMS,
+  LOAD_METHODS,
+  settingsDraft,
+  settingsPatch,
+  type SettingsDraft,
+} from './settings-draft.js';
+
+type SaveSettings = ReturnType<typeof useSaveSettings>;
 
 export function SettingsPage() {
-  const { i18n } = useLingui();
   const settings = useSettings();
   const save = useSaveSettings();
-  const [libraryRoot, setLibraryRoot] = useState('');
-  const [preSec, setPreSec] = useState('2');
-  const [postSec, setPostSec] = useState('1.5');
-  const [gradeSystem, setGradeSystem] = useState('v');
-  const [loadMethod, setLoadMethod] = useState('rolling');
-  const [retention, setRetention] = useState('30');
+  if (!settings.data) return <section className="panel" aria-busy="true" />;
+  // Remount on each saved version so the form shows what the server stored.
+  return <SettingsForm key={settings.data.version} settings={settings.data} save={save} />;
+}
 
-  useEffect(() => {
-    const data = settings.data;
-    if (!data) return;
-    setLibraryRoot(data.libraryRoot ?? '');
-    setPreSec(String(data.prePadUs / 1_000_000));
-    setPostSec(String(data.postPadUs / 1_000_000));
-    setGradeSystem(data.gradeSystem);
-    setLoadMethod(data.loadMethod);
-    setRetention(String(data.trashRetentionDays));
-  }, [settings.data]);
+function SettingsForm({ settings, save }: { settings: Settings; save: SaveSettings }) {
+  const { i18n } = useLingui();
+  const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraft(settings));
+  const [invalid, setInvalid] = useState(false);
+  const movedLibrary = save.isSuccess && save.variables.libraryRoot !== undefined;
+  const set = (patch: Partial<SettingsDraft>) => setDraft((current) => ({ ...current, ...patch }));
 
   return (
     <form
       className="panel"
       onSubmit={(event) => {
         event.preventDefault();
-        void save.mutateAsync({
-          libraryRoot: libraryRoot === '' ? null : libraryRoot,
-          prePadUs: Math.round(Number(preSec) * 1_000_000),
-          postPadUs: Math.round(Number(postSec) * 1_000_000),
-          gradeSystem: gradeSystem as 'v' | 'font' | 'yds' | 'french',
-          loadMethod: loadMethod as 'rolling' | 'ewma',
-          trashRetentionDays: Number(retention),
-          expectedVersion: settings.data?.version,
-        });
+        const patch = settingsPatch(draft, settings);
+        setInvalid(patch === null);
+        if (!patch) return;
+        save.mutate(patch);
       }}
     >
       <h1>{i18n._('settings.title')}</h1>
       <label>
         {i18n._('settings.library')}
-        <input value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)} />
+        <input value={draft.libraryRoot} onChange={(e) => set({ libraryRoot: e.target.value })} />
       </label>
       <label>
         {i18n._('settings.pre')}
-        <input value={preSec} onChange={(event) => setPreSec(event.target.value)} />
+        <input
+          inputMode="decimal"
+          value={draft.preSec}
+          onChange={(e) => set({ preSec: e.target.value })}
+        />
       </label>
       <label>
         {i18n._('settings.post')}
-        <input value={postSec} onChange={(event) => setPostSec(event.target.value)} />
+        <input
+          inputMode="decimal"
+          value={draft.postSec}
+          onChange={(e) => set({ postSec: e.target.value })}
+        />
       </label>
       <label>
         {i18n._('settings.grade')}
-        <select value={gradeSystem} onChange={(event) => setGradeSystem(event.target.value)}>
-          <option value="v">V-scale</option>
-          <option value="font">Fontainebleau</option>
-          <option value="yds">YDS</option>
-          <option value="french">French</option>
+        <select
+          value={draft.gradeSystem}
+          onChange={(e) => set({ gradeSystem: e.target.value as Settings['gradeSystem'] })}
+        >
+          {GRADE_SYSTEMS.map((system) => (
+            <option key={system} value={system}>
+              {i18n._(`settings.grade.${system}`)}
+            </option>
+          ))}
         </select>
       </label>
       <label>
         {i18n._('settings.load')}
-        <select value={loadMethod} onChange={(event) => setLoadMethod(event.target.value)}>
-          <option value="rolling">rolling</option>
-          <option value="ewma">ewma</option>
+        <select
+          value={draft.loadMethod}
+          onChange={(e) => set({ loadMethod: e.target.value as Settings['loadMethod'] })}
+        >
+          {LOAD_METHODS.map((method) => (
+            <option key={method} value={method}>
+              {i18n._(`settings.load.${method}`)}
+            </option>
+          ))}
         </select>
       </label>
       <label>
         {i18n._('settings.retention')}
-        <input value={retention} onChange={(event) => setRetention(event.target.value)} />
+        <input
+          inputMode="numeric"
+          value={draft.retentionDays}
+          onChange={(e) => set({ retentionDays: e.target.value })}
+        />
       </label>
-      <button type="submit">{i18n._('settings.save')}</button>
+      {invalid ? <p className="error">{i18n._('settings.invalid')}</p> : null}
+      {save.error ? (
+        <p className="error" role="alert">
+          {errorText(save.error, i18n._('error.generic'))}
+        </p>
+      ) : null}
+      <button type="submit" disabled={save.isPending}>
+        {i18n._('settings.save')}
+      </button>
+      {save.isSuccess ? <p className="status">{i18n._('settings.saved')}</p> : null}
+      {movedLibrary ? <p className="status">{i18n._('settings.libraryRestart')}</p> : null}
     </form>
   );
 }

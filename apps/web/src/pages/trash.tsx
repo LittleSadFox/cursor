@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react';
 
+import { errorText, formatMessage } from '../format.js';
 import { useTrash, useTrashActions } from '../hooks/queries.js';
 
 export function TrashPage() {
@@ -16,17 +17,32 @@ export function TrashPage() {
         {items.map((item) => (
           <li key={`${item.kind}:${item.id}`}>
             <span>
-              {item.kind} — {item.title}
+              {i18n._(`trash.kind.${item.kind}`)} — {item.title}
             </span>
             <button type="button" onClick={() => actions.restore.mutate(item)}>
               {i18n._('trash.restore')}
             </button>
-            <button type="button" onClick={() => actions.purge.mutate(item)}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                if (
+                  window.confirm(formatMessage(i18n._('trash.confirmPurge'), { title: item.title }))
+                ) {
+                  actions.purge.mutate(item);
+                }
+              }}
+            >
               {i18n._('trash.purge')}
             </button>
           </li>
         ))}
       </ul>
+      {actions.restore.error || actions.purge.error ? (
+        <p className="error" role="alert">
+          {errorText(actions.restore.error ?? actions.purge.error, i18n._('error.generic'))}
+        </p>
+      ) : null}
     </section>
   );
 }

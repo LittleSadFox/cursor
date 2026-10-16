@@ -1,10 +1,8 @@
 import { useLingui } from '@lingui/react';
 import { useNavigate } from '@tanstack/react-router';
 
+import { errorText } from '../format.js';
 import { useSaveSettings, useSettings } from '../hooks/queries.js';
-
-const LINUX_DEFAULT = 'Climbing Coach Library in your home folder';
-const MAC_DEFAULT = '~/Movies/Climbing Coach Library';
 
 export function SetupPage() {
   const { i18n } = useLingui();
@@ -13,7 +11,7 @@ export function SetupPage() {
   const navigate = useNavigate();
   const suggested =
     settings.data?.libraryRoot ??
-    (navigator.userAgent.includes('Mac') ? MAC_DEFAULT : LINUX_DEFAULT);
+    i18n._(navigator.userAgent.includes('Mac') ? 'setup.defaultMac' : 'setup.defaultOther');
 
   return (
     <section className="panel">
@@ -22,10 +20,7 @@ export function SetupPage() {
       <p>{i18n._('setup.privacy')}</p>
       <label>
         {i18n._('setup.path')}
-        <input
-          id="library-path"
-          defaultValue={typeof suggested === 'string' ? suggested : ''}
-        />
+        <input id="library-path" defaultValue={typeof suggested === 'string' ? suggested : ''} />
       </label>
       <button
         type="button"
@@ -38,7 +33,9 @@ export function SetupPage() {
       >
         {i18n._('setup.confirm')}
       </button>
-      {save.error ? <p className="error">{String(save.error)}</p> : null}
+      {save.error ? (
+        <p className="error">{errorText(save.error, i18n._('error.generic'))}</p>
+      ) : null}
     </section>
   );
 }
