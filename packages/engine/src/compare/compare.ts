@@ -12,9 +12,11 @@ import {
 } from './divergence.js';
 import {
   meanFinite,
+  moveDifferences,
   summarizeByMove,
   topDifferences,
   type ComparisonSummary,
+  type Difference,
   type MoveSummary,
 } from './summary.js';
 import { contactsAt } from './support.js';
@@ -28,6 +30,8 @@ export type CompareSide = {
 
 export type MoveMatch = { a: number; b: number | null; cost?: number };
 
+export type MoveResult = MoveSummary & { differences: Difference[] };
+
 export type ComparisonResult = {
   /** Int32 frame-index pairs `[L × 2]` into A's and B's samples. */
   warp: Int32Array;
@@ -36,7 +40,7 @@ export type ComparisonResult = {
   /** One divergence score per warp step. */
   score: Float32Array;
   moveMatches: MoveMatch[];
-  perMove: MoveSummary[];
+  perMove: MoveResult[];
   summary: ComparisonSummary;
 };
 
@@ -80,7 +84,7 @@ export function comparePostures(
     deltas: series.deltas,
     score: series.score,
     moveMatches: moveMatchesOf(a.moves, b.moves, perMove),
-    perMove,
+    perMove: perMove.map((move) => ({ ...move, differences: moveDifferences(move, params) })),
     summary: {
       meanDivergence: meanFinite(series.score),
       topDifferences: topDifferences(perMove, params),

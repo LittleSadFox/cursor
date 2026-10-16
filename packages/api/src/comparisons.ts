@@ -59,6 +59,8 @@ export const MoveComparisonSchema = z.object({
   steps: z.number().int().nonnegative(),
   meanScore: z.number().nullable(),
   meanDeltas: z.array(z.number().nullable()),
+  /** Every difference of this move above the reporting minimum, largest first. */
+  differences: z.array(ComparisonDifferenceSchema),
 });
 export type MoveComparison = z.infer<typeof MoveComparisonSchema>;
 

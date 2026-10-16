@@ -96,27 +96,44 @@ function scaleFor(metric: DifferenceFacts['metric'], params: CompareParams): num
   return metric === 'angleDeg' ? params.angleScaleDeg : params.torsoScale;
 }
 
+type WeightedFacts = DifferenceFacts & { weight: number };
+
+function weightedFacts(move: MoveSummary, params: CompareParams): WeightedFacts[] {
+  const facts: WeightedFacts[] = [];
+  move.meanDeltas.forEach((meanDelta, channel) => {
+    const joint = DIVERGENCE_CHANNELS[channel];
+    if (joint === undefined || !Number.isFinite(meanDelta)) return;
+    const metric = channelMetric(joint);
+    if (Math.abs(meanDelta) < minimumFor(metric, params)) return;
+    const weight = Math.abs(meanDelta) / scaleFor(metric, params);
+    facts.push({ moveIndexA: move.moveIndexA, joint, metric, meanDelta, weight });
+  });
+  return facts;
+}
+
+function byWeight(x: WeightedFacts, y: WeightedFacts): number {
+  return y.weight - x.weight || x.moveIndexA - y.moveIndexA;
+}
+
+function described({ weight: _weight, ...facts }: WeightedFacts): Difference {
+  return { ...facts, text: describeDifference(facts) };
+}
+
+/** Every difference of one move above the reporting minimum, largest first, with English text. */
+export function moveDifferences(
+  move: MoveSummary,
+  params: CompareParams = STARTING_PARAMS.compare,
+): Difference[] {
+  return weightedFacts(move, params).sort(byWeight).map(described);
+}
+
 /** Largest per-move differences above the reporting minimum, with English text. */
 export function topDifferences(
   moves: readonly MoveSummary[],
   params: CompareParams = STARTING_PARAMS.compare,
 ): Difference[] {
-  const candidates: (DifferenceFacts & { weight: number })[] = [];
-  for (const move of moves) {
-    move.meanDeltas.forEach((meanDelta, channel) => {
-      const joint = DIVERGENCE_CHANNELS[channel];
-      if (joint === undefined || !Number.isFinite(meanDelta)) return;
-      const metric = channelMetric(joint);
-      if (Math.abs(meanDelta) < minimumFor(metric, params)) return;
-      const weight = Math.abs(meanDelta) / scaleFor(metric, params);
-      candidates.push({ moveIndexA: move.moveIndexA, joint, metric, meanDelta, weight });
-    });
-  }
-  candidates.sort((x, y) => y.weight - x.weight || x.moveIndexA - y.moveIndexA);
-  return candidates.slice(0, params.topDifferences).map(({ weight: _weight, ...facts }) => ({
-    ...facts,
-    text: describeDifference(facts),
-  }));
+  const candidates = moves.flatMap((move) => weightedFacts(move, params));
+  return candidates.sort(byWeight).slice(0, params.topDifferences).map(described);
 }
 
 export function meanFinite(values: ArrayLike<number>): number {

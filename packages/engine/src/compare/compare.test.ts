@@ -20,7 +20,7 @@ import {
 } from './divergence.js';
 import { centerOfMass, hipToHands, jointAnglesDeg } from './posture.js';
 import { comSupportOffset, contactsAt, convexHull, polygonDistance } from './support.js';
-import { topDifferences, type MoveSummary } from './summary.js';
+import { moveDifferences, topDifferences, type MoveSummary } from './summary.js';
 
 const RIGHT_KNEE = COMPARE_JOINTS.indexOf('rightKnee');
 
@@ -250,6 +250,9 @@ describe('comparePostures', () => {
     const top = result.summary.topDifferences[0];
     expect(top?.joint).toBe('rightKnee');
     expect(top?.text).toMatch(/^Right knee 15° straighter through move \d+$/);
+    const reported = result.perMove.flatMap((move) => move.differences);
+    expect(reported.length).toBeGreaterThan(0);
+    expect(reported.every((difference) => difference.joint === 'rightKnee')).toBe(true);
   });
 });
 
@@ -272,6 +275,14 @@ describe('summaries and text', () => {
       [0, 'rightHip'],
     ]);
     expect(top[1]?.text).toBe('Right hip 15° more open through move 1');
+  });
+
+  it('lists every reportable difference of one move, largest first', () => {
+    const differences = moveDifferences(
+      move(1, { rightKnee: -12, leftHip: 25, hipToHands: 0.05, leftElbow: 9 }),
+    );
+    expect(differences.map((d) => d.joint)).toEqual(['leftHip', 'rightKnee']);
+    expect(differences.every((d) => d.moveIndexA === 1)).toBe(true);
   });
 
   it('phrases each metric as an observation', () => {

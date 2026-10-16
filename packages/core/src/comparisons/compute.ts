@@ -97,6 +97,7 @@ export function resultJson(a: LoadedSide, result: ComparisonResult): ComparisonR
     steps: move.steps,
     meanScore: finiteOrNull(move.meanScore),
     meanDeltas: move.meanDeltas.map(finiteOrNull),
+    differences: move.differences.map((difference) => ({ ...difference })),
   }));
   return {
     steps: result.score.length,

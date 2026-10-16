@@ -131,6 +131,7 @@ export {
 } from './compare/divergence.js';
 export { describeDifference, type DifferenceFacts } from './compare/describe.js';
 export {
+  moveDifferences,
   summarizeByMove,
   topDifferences,
   type ComparisonSummary,
@@ -143,6 +144,7 @@ export {
   type CompareSide,
   type ComparisonResult,
   type MoveMatch,
+  type MoveResult,
 } from './compare/compare.js';
 
 export {
