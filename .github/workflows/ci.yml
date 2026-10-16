@@ -126,8 +126,8 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: bash scripts/ffmpeg/sign-dummy-app.sh
 
-      - name: Locator finds the CI prefix
-        run: pnpm --filter @climbing-coach/adapters-node test
+      - name: Locator and ffmpeg helper tests
+        run: pnpm --filter @climbing-coach/adapters-node exec vitest run src/ffmpeg
 
       - name: Upload ffmpeg artifacts
         uses: actions/upload-artifact@v4
