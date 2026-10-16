@@ -11,8 +11,10 @@ export type FrameSignal = {
   wristsAboveShoulders: boolean;
   crouched: boolean;
   wristsStationary: boolean;
-  /** Smaller y is higher in the image. */
+  /** Higher of the two wrists. Smaller y is higher in the image. */
   wristY: number;
+  /** Lower of the two wrists. Both wrists are at the high point only when this is too. */
+  lowerWristY: number;
   hipX: number;
   hipY: number;
   exitEdge: ExitDirection;

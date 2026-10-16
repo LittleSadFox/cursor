@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { CLIMB_SCENARIOS, FRAME_US, type RawSample } from '@climbing-coach/test-fixtures';
+import {
+  CLIMB_SCENARIOS,
+  FRAME_US,
+  standClimbFall,
+  type RawSample,
+} from '@climbing-coach/test-fixtures';
 
 import { STARTING_PARAMS } from '../params.js';
 import { selectClimberTrack } from '../pose/select-track.js';
 import type { PoseSample } from '../pose/types.js';
-import { detectAttempts } from './attempts.js';
+import { detectAttempts, detectEnds, detectStarts } from './attempts.js';
+import { estimateFloor } from './floor.js';
 import { boundaryOffsetUs } from './offset.js';
 
 function toSamples(raw: readonly RawSample[]): PoseSample[] {
@@ -49,6 +55,31 @@ describe('detect', () => {
       if (scenario.name === 'stand-climb-fall') expect(floor.confidence).toBe('high');
     },
   );
+
+  it.each(CLIMB_SCENARIOS.map((scenario) => [scenario.name, scenario] as const))(
+    '%s: detectStarts and detectEnds agree with detectAttempts',
+    (_name, scenario) => {
+      const { attempts, signals, floor } = detectAttempts(toSamples(scenario.samples));
+      const params = STARTING_PARAMS.detect;
+      expect(detectStarts(signals, params, floor.bodyHeight)).toEqual(
+        attempts.map((attempt) => attempt.startUs),
+      );
+      expect(detectEnds(signals, params, floor.bodyHeight)).toEqual(
+        attempts.map(({ endUs, outcome, exitDirection }) => ({
+          tUs: endUs,
+          outcome,
+          exitDirection,
+        })),
+      );
+    },
+  );
+
+  it('estimates the floor on a multi-hour track without overflowing the stack', () => {
+    const one = toSamples(standClimbFall().samples.slice(0, 1))[0];
+    if (!one) throw new Error('expected a sample');
+    const long = Array.from({ length: 200_000 }, (_, index) => ({ ...one, tUs: index * 33_333 }));
+    expect(estimateFloor(long).confidence).toBe('high');
+  });
 
   it('applies a boundary offset only with enough same-sign labels', () => {
     const late = Array.from({ length: 20 }, () => 200_000);

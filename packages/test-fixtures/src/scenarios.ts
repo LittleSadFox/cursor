@@ -96,6 +96,74 @@ export function jumpOffTop(): ClimbScenario {
   ]);
 }
 
+/**
+ * One hand pauses on the highest hold while the other stays low, then a fall.
+ * Only a match (both wrists at the high point) counts as a top.
+ */
+export function oneHandPauseFall(): ClimbScenario {
+  const builder = new PoseBuilder();
+  builder.hold(STAND, 1.5);
+  builder.ramp(STAND, REACH, 0.4);
+  const start = builder.hold(REACH, 0.6, -0.06);
+  const high: BodyPose = { ...REACH, wristY: REACH.wristY - 0.06, leftWristY: REACH.wristY + 0.15 };
+  builder.hold(high, 1);
+  const end = builder.ramp(high, STAND, 0.2);
+  builder.hold(STAND, 1);
+  return done('one-hand-pause-fall', builder, [
+    { startUs: builder.tUsAt(start), endUs: builder.tUsAt(end), outcome: 'fall' },
+  ]);
+}
+
+/** Match at the top, then the climber leaves through the side and does not come back. */
+export function topThenWalkOff(): ClimbScenario {
+  const builder = new PoseBuilder();
+  builder.hold(STAND, 1);
+  builder.ramp(STAND, REACH, 0.4);
+  const start = builder.hold(REACH, 1.1);
+  const endFrame = builder.samples.length - 1;
+  builder.hold({ ...REACH, x: -0.2, visibility: 0 }, 4);
+  builder.hold(STAND, 0.6);
+  return done('top-then-walk-off', builder, [
+    {
+      startUs: builder.tUsAt(start),
+      endUs: builder.tUsAt(endFrame),
+      outcome: 'top',
+      exitDirection: 'left',
+    },
+  ]);
+}
+
+const MISSING: BodyPose = {
+  x: Number.NaN,
+  ankleY: Number.NaN,
+  hipY: Number.NaN,
+  shoulderY: Number.NaN,
+  wristY: Number.NaN,
+  visibility: Number.NaN,
+};
+
+/**
+ * Climber moves up and out through the top. Out-of-frame landmarks are NaN, as the
+ * pose runtime reports them, so only the last in-frame position shows the edge.
+ */
+export function exitTopMissing(): ClimbScenario {
+  const builder = new PoseBuilder();
+  builder.hold(STAND, 1);
+  builder.ramp(STAND, REACH, 0.4);
+  const start = builder.hold(REACH, 0.8, -0.04);
+  builder.ramp(REACH, { ...REACH, ankleY: 0.4, hipY: 0.1, shoulderY: -0.1, wristY: -0.2 }, 0.5);
+  const endFrame = builder.samples.length - 1;
+  builder.hold(MISSING, 0.5);
+  return done('exit-top-missing', builder, [
+    {
+      startUs: builder.tUsAt(start),
+      endUs: builder.tUsAt(endFrame),
+      outcome: 'top',
+      exitDirection: 'top',
+    },
+  ]);
+}
+
 /** Climber leaves through the top of the frame without a finish dwell. */
 export function exitTop(): ClimbScenario {
   const builder = new PoseBuilder();
@@ -225,7 +293,10 @@ export const CLIMB_SCENARIOS: readonly ClimbScenario[] = [
   sitStart(),
   topDownclimb(),
   jumpOffTop(),
+  oneHandPauseFall(),
+  topThenWalkOff(),
   exitTop(),
+  exitTopMissing(),
   alreadyOnWall(),
   twoAttempts(),
   walkOutShort(),

@@ -29,7 +29,8 @@ export function estimateFloor(
   if (lows.length === 0) {
     return { floorY: 1, confidence: 'low', alreadyOnWall: true, bodyHeight };
   }
-  const globalLow = Math.max(...lows.map((sample) => sample.y));
+  let globalLow = Number.NEGATIVE_INFINITY;
+  for (const low of lows) globalLow = Math.max(globalLow, low.y);
   const early = lows.filter((sample) => sample.tUs <= origin + params.detect.floorWindowUs);
   const earlyMedian = median(early.map((sample) => sample.y));
   const lifted = params.detect.ankleLiftBodyHeights * bodyHeight;

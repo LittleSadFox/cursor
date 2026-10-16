@@ -19,6 +19,8 @@ export type BodyPose = {
   hipY: number;
   shoulderY: number;
   wristY: number;
+  /** Left wrist height when the hands are on different holds. Defaults to `wristY`. */
+  leftWristY?: number;
   visibility: number;
 };
 
@@ -80,14 +82,15 @@ export function landmarksFor(pose: BodyPose, wristOffset = 0): number[][] {
     points[INDEX[name]] = [x, y, 0, pose.visibility];
   };
   const wristY = pose.wristY + wristOffset;
+  const leftWristY = (pose.leftWristY ?? pose.wristY) + wristOffset;
   const kneeY = (pose.hipY + pose.ankleY) / 2;
   const elbowY = (pose.shoulderY + wristY) / 2;
   set('nose', pose.x, pose.shoulderY - 0.08);
   set('leftShoulder', pose.x - 0.08, pose.shoulderY);
   set('rightShoulder', pose.x + 0.08, pose.shoulderY);
-  set('leftElbow', pose.x - 0.1, elbowY);
+  set('leftElbow', pose.x - 0.1, (pose.shoulderY + leftWristY) / 2);
   set('rightElbow', pose.x + 0.1, elbowY);
-  set('leftWrist', pose.x - 0.12, wristY);
+  set('leftWrist', pose.x - 0.12, leftWristY);
   set('rightWrist', pose.x + 0.12, wristY);
   set('leftHip', pose.x - 0.06, pose.hipY);
   set('rightHip', pose.x + 0.06, pose.hipY);
@@ -110,6 +113,9 @@ export function lerpPose(from: BodyPose, to: BodyPose, t: number): BodyPose {
     hipY: mix(from.hipY, to.hipY),
     shoulderY: mix(from.shoulderY, to.shoulderY),
     wristY: mix(from.wristY, to.wristY),
+    ...(from.leftWristY !== undefined || to.leftWristY !== undefined
+      ? { leftWristY: mix(from.leftWristY ?? from.wristY, to.leftWristY ?? to.wristY) }
+      : {}),
     visibility: t < 1 ? from.visibility : to.visibility,
   };
 }

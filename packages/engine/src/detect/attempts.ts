@@ -2,36 +2,30 @@ import { at } from '../math.js';
 import { STARTING_PARAMS, type StartingParams } from '../params.js';
 import type { PoseSample } from '../pose/types.js';
 import { estimateFloor } from './floor.js';
-import { detectorSignals } from './signals.js';
-import type { AttemptDetection, ExitDirection, FrameSignal } from './types.js';
+import { detectorSignals, exitEdge } from './signals.js';
+import type { AttemptDetection, ExitDirection, FloorEstimate, FrameSignal } from './types.js';
 
 type DetectParams = StartingParams['detect'];
 
-export function detectStarts(signals: readonly FrameSignal[], params: DetectParams): number[] {
-  const starts: number[] = [];
-  let index = 0;
-  while (index < signals.length) {
-    if (!confirmedStart(signals, index, params)) {
-      index += 1;
-      continue;
-    }
-    starts.push(at(signals, index).tUs);
-    const end = findEnd(signals, index, params, 1);
-    index = end.nextIndex;
-  }
-  return starts;
-}
+type EndMatch = {
+  endIndex: number;
+  nextIndex: number;
+  outcome: AttemptDetection['outcome'];
+  exitDirection: ExitDirection;
+};
 
-export function detectEnds(
+type AttemptSpan = { startIndex: number; end: EndMatch };
+
+/**
+ * One pass over the signals: each confirmed start is paired with its end, and the
+ * next start is searched for after that end. Starts, ends, and attempts all read this.
+ */
+function scanAttempts(
   signals: readonly FrameSignal[],
   params: DetectParams,
   bodyHeight: number,
-): { tUs: number; outcome: AttemptDetection['outcome']; exitDirection: ExitDirection }[] {
-  const ends: {
-    tUs: number;
-    outcome: AttemptDetection['outcome'];
-    exitDirection: ExitDirection;
-  }[] = [];
+): AttemptSpan[] {
+  const spans: AttemptSpan[] = [];
   let index = 0;
   while (index < signals.length) {
     if (!confirmedStart(signals, index, params)) {
@@ -39,14 +33,30 @@ export function detectEnds(
       continue;
     }
     const end = findEnd(signals, index, params, bodyHeight);
-    ends.push({
-      tUs: at(signals, end.endIndex).tUs,
-      outcome: end.outcome,
-      exitDirection: end.exitDirection,
-    });
+    spans.push({ startIndex: index, end });
     index = end.nextIndex;
   }
-  return ends;
+  return spans;
+}
+
+export function detectStarts(
+  signals: readonly FrameSignal[],
+  params: DetectParams,
+  bodyHeight: number,
+): number[] {
+  return scanAttempts(signals, params, bodyHeight).map((span) => at(signals, span.startIndex).tUs);
+}
+
+export function detectEnds(
+  signals: readonly FrameSignal[],
+  params: DetectParams,
+  bodyHeight: number,
+): { tUs: number; outcome: AttemptDetection['outcome']; exitDirection: ExitDirection }[] {
+  return scanAttempts(signals, params, bodyHeight).map(({ end }) => ({
+    tUs: at(signals, end.endIndex).tUs,
+    outcome: end.outcome,
+    exitDirection: end.exitDirection,
+  }));
 }
 
 export function classifyOutcome(
@@ -63,7 +73,7 @@ export function detectAttempts(
   samples: readonly PoseSample[],
   params: StartingParams = STARTING_PARAMS,
 ): {
-  floor: ReturnType<typeof estimateFloor>;
+  floor: FloorEstimate;
   attempts: AttemptDetection[];
   signals: FrameSignal[];
 } {
@@ -74,29 +84,16 @@ export function detectAttempts(
 
 export function detectFromSignals(
   signals: readonly FrameSignal[],
-  floor: { confidence: 'high' | 'low'; bodyHeight: number },
+  floor: Pick<FloorEstimate, 'confidence' | 'bodyHeight'>,
   params: StartingParams = STARTING_PARAMS,
 ): AttemptDetection[] {
-  const attempts: AttemptDetection[] = [];
-  let index = 0;
-  while (index < signals.length) {
-    if (!confirmedStart(signals, index, params.detect)) {
-      index += 1;
-      continue;
-    }
-    const start = at(signals, index);
-    const end = findEnd(signals, index, params.detect, floor.bodyHeight);
-    const endSignal = at(signals, end.endIndex);
-    attempts.push({
-      startUs: start.tUs,
-      endUs: endSignal.tUs,
-      outcome: end.outcome,
-      exitDirection: end.exitDirection,
-      startConfidence: floor.confidence,
-    });
-    index = end.nextIndex;
-  }
-  return attempts;
+  return scanAttempts(signals, params.detect, floor.bodyHeight).map(({ startIndex, end }) => ({
+    startUs: at(signals, startIndex).tUs,
+    endUs: at(signals, end.endIndex).tUs,
+    outcome: end.outcome,
+    exitDirection: end.exitDirection,
+    startConfidence: floor.confidence,
+  }));
 }
 
 function confirmedStart(
@@ -107,25 +104,13 @@ function confirmedStart(
   const start = at(signals, index);
   if (!start.inFrame || !start.bothAnklesUp || !start.hipStill) return false;
   if (!start.wristsAboveShoulders && !start.crouched) return false;
-  let reached = false;
   for (let cursor = index; cursor < signals.length; cursor += 1) {
     const frame = at(signals, cursor);
-    const dt = frame.tUs - start.tUs;
     if (!frame.inFrame || !frame.bothAnklesUp || !frame.hipStill) return false;
-    if (dt >= params.hipStillUs) {
-      reached = true;
-      break;
-    }
+    if (frame.tUs - start.tUs >= params.hipStillUs) return true;
   }
-  return reached;
+  return false;
 }
-
-type EndMatch = {
-  endIndex: number;
-  nextIndex: number;
-  outcome: AttemptDetection['outcome'];
-  exitDirection: ExitDirection;
-};
 
 function findReturn(
   signals: readonly FrameSignal[],
@@ -139,6 +124,22 @@ function findReturn(
     if (frame.inFrame && frame.bothAnklesUp) return cursor;
   }
   return null;
+}
+
+/**
+ * Edge the climber left through. Pose runtimes report missing landmarks as NaN, so
+ * when the exit frame has no hip position the last in-frame hip decides, if it was
+ * near an edge.
+ */
+function exitDirectionAt(
+  signals: readonly FrameSignal[],
+  index: number,
+  params: DetectParams,
+): ExitDirection {
+  const frame = at(signals, index);
+  if (frame.exitEdge !== 'none' || index === 0) return frame.exitEdge;
+  const last = at(signals, index - 1);
+  return exitEdge(last.hipX, last.hipY, params.lastSeenEdgeMargin);
 }
 
 function findEnd(
@@ -160,11 +161,11 @@ function findEnd(
         cursor = returned - 1;
         continue;
       }
-      const edge = frame.exitEdge;
+      const edge = exitDirectionAt(signals, cursor, params);
       return {
         endIndex: Math.max(startIndex, cursor - 1),
         nextIndex: cursor,
-        outcome: edge === 'top' ? 'top' : 'unknown',
+        outcome: topped || edge === 'top' ? 'top' : 'unknown',
         exitDirection: edge,
       };
     }
@@ -173,8 +174,8 @@ function findEnd(
       dwellStartUs = null;
       topped = false;
     }
-    const atMax = frame.wristY <= maxWrist + slack;
-    if (atMax && frame.wristsStationary) {
+    const bothAtMax = frame.lowerWristY <= maxWrist + slack;
+    if (bothAtMax && frame.wristsStationary) {
       if (dwellStartUs === null) dwellStartUs = frame.tUs;
       if (frame.tUs - dwellStartUs >= params.topDwellUs) topped = true;
     } else {
@@ -200,9 +201,8 @@ function findEnd(
       };
     }
   }
-  const last = signals.length - 1;
   return {
-    endIndex: last,
+    endIndex: signals.length - 1,
     nextIndex: signals.length,
     outcome: topped ? 'top' : 'unknown',
     exitDirection: 'none',

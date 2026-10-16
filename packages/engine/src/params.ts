@@ -39,6 +39,10 @@ export const STARTING_PARAMS = {
     topDwellUs: 700_000,
     walkOutGapUs: 3_000_000,
     wristAtMaxEpsilonBodyHeights: 0.05,
+    /** Hip within this fraction of the frame edge counts as leaving through it. */
+    exitEdgeMargin: 0.02,
+    /** When the exit frame has no hip position, use the last in-frame hip within this margin. */
+    lastSeenEdgeMargin: 0.2,
     floorWindowUs: 1_000_000,
     boundaryOffsetBoundUs: 1_000_000,
     boundaryOffsetMinLabels: 20,
