@@ -229,6 +229,10 @@ describe('comparisons', () => {
         moveIndexA: move,
       }),
     ]);
+
+    await api.comparisons.feedback(created.id, { moveIndexA: move, verdict: 'aligned' });
+    expect(listLabels(memory.db, 'alignment_feedback')).toHaveLength(3);
+    expect(alignmentRegressionCases(memory.db)).toEqual([]);
   });
 
   it('reports export as blocked on ffmpeg', async () => {
