@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { LANDMARK_COUNT, LANDMARK_STRIDE } from './landmarks.js';
-import { slicePoseTrack } from './pose-slice.js';
+import { clipWindows, slicePoseTrack } from './pose-slice.js';
 import { readPosebin, writePosebin } from './posebin.js';
 import type { PoseTrack } from './pose-track.js';
 
@@ -59,5 +59,31 @@ describe('slicePoseTrack', () => {
     const slice = slicePoseTrack(track(10), 500_000, 2_000_000);
     expect(slice?.header.tracks.map((ref) => ref.trackId)).toEqual([CLIMBER]);
     expect(slicePoseTrack(track(10), 5_000_000, 6_000_000)).toBeNull();
+  });
+
+  it('clips active windows to the slice', () => {
+    const full = track(10);
+    full.header.windows = [
+      { startUs: 0, endUs: 300_000 },
+      { startUs: 400_000, endUs: 1_000_000 },
+    ];
+    const slice = slicePoseTrack(full, 350_000, 600_000);
+    expect(slice?.header.windows).toEqual([{ startUs: 400_000, endUs: 600_000 }]);
+    expect(readPosebin(writePosebin(slice as PoseTrack)).header.windows).toHaveLength(1);
+  });
+});
+
+describe('clipWindows', () => {
+  it('intersects each window with the range and drops empty ones', () => {
+    const windows = [
+      { startUs: 0, endUs: 100 },
+      { startUs: 200, endUs: 400 },
+      { startUs: 500, endUs: 600 },
+    ];
+    expect(clipWindows(windows, 100, 550)).toEqual([
+      { startUs: 200, endUs: 400 },
+      { startUs: 500, endUs: 550 },
+    ]);
+    expect(clipWindows(windows, 0, Number.POSITIVE_INFINITY)).toEqual(windows);
   });
 });

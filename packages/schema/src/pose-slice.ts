@@ -1,5 +1,6 @@
 import { LANDMARK_COUNT, LANDMARK_STRIDE } from './landmarks.js';
-import type { PoseTrack, PoseTrackRef } from './pose-track.js';
+import type { ActiveWindow, PoseTrack, PoseTrackRef } from './pose-track.js';
+import { usOrThrow } from './time.js';
 
 const FRAME_FLOATS = LANDMARK_COUNT * LANDMARK_STRIDE;
 
@@ -9,6 +10,21 @@ function frameRange(tUs: Float64Array, fromUs: number, toUs: number): [number, n
   let end = first;
   while (end < tUs.length && (tUs[end] ?? 0) < toUs) end += 1;
   return [first, end];
+}
+
+/** Active windows intersected with `[fromUs, toUs)`; windows outside the slice are dropped. */
+export function clipWindows(
+  windows: readonly ActiveWindow[],
+  fromUs: number,
+  toUs: number,
+): ActiveWindow[] {
+  return windows.flatMap((window) => {
+    const startUs = Math.max(window.startUs, fromUs);
+    const endUs = Math.min(window.endUs, toUs);
+    return startUs < endUs
+      ? [{ startUs: usOrThrow(startUs, 'window startUs'), endUs: usOrThrow(endUs, 'window endUs') }]
+      : [];
+  });
 }
 
 /**
@@ -34,7 +50,12 @@ export function slicePoseTrack(track: PoseTrack, fromUs: number, toUs: number): 
   }
   if (!tracks.some((ref) => ref.trackId === track.header.selectedTrackId)) return null;
   return {
-    header: { ...track.header, tracks, frameCount: end - first },
+    header: {
+      ...track.header,
+      windows: clipWindows(track.header.windows, fromUs, toUs),
+      tracks,
+      frameCount: end - first,
+    },
     tUs: track.tUs.slice(first, end),
     landmarksByTrack,
   };
