@@ -1,9 +1,13 @@
 import {
   STARTING_PARAMS,
   align,
+  alignFrames,
   clipRangeOf,
+  comparePostures,
   detectAttempts,
+  segmentMoves,
   validateDraft,
+  type PoseSample,
 } from '@climbing-coach/engine';
 
 import { flagValue, hasFlag, usage } from '../args.js';
@@ -35,6 +39,42 @@ export function alignCommand(args: readonly string[]): void {
   });
   console.log(JSON.stringify({ cost: result.cost, steps: result.path.length }));
   writeJson(flagValue(args, 'json'), result);
+}
+
+function wholeRange(samples: readonly PoseSample[]): { startUs: number; endUs: number } {
+  return {
+    startUs: samples[0]?.tUs ?? 0,
+    endUs: (samples[samples.length - 1]?.tUs ?? 0) + 1,
+  };
+}
+
+/** Align two pose tracks, then compare postures (P3.1). Each file is one attempt's climb. */
+export function compareCommand(args: readonly string[]): void {
+  const a = flagValue(args, 'a');
+  const b = flagValue(args, 'b');
+  if (!a || !b) return usage('coach compare --a <poses> --b <poses> [--open-end] [--json <out>]');
+  const samplesA = loadPoses(a);
+  const samplesB = loadPoses(b);
+  const alignment = align(alignFrames(samplesA), alignFrames(samplesB), {
+    openEnd: hasFlag(args, 'open-end'),
+  });
+  const result = comparePostures(
+    { samples: samplesA, moves: segmentMoves(samplesA, wholeRange(samplesA)) },
+    { samples: samplesB, moves: segmentMoves(samplesB, wholeRange(samplesB)) },
+    alignment,
+  );
+  const body = {
+    steps: result.score.length,
+    moveMatches: result.moveMatches,
+    summary: result.summary,
+  };
+  console.log(JSON.stringify(body));
+  writeJson(flagValue(args, 'json'), {
+    ...body,
+    perMove: result.perMove,
+    warp: Array.from(result.warp),
+    score: Array.from(result.score),
+  });
 }
 
 /** `cut --draft` validates a review draft and prints clip ranges. Cutting video needs ffmpeg. */

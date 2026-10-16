@@ -20,6 +20,7 @@ export function printHelp(): void {
   console.log('  eval --fixture <path> [--json <out>]');
   console.log('  detect --poses <path> [--json <out>]');
   console.log('  align --a <path> --b <path> [--open-end] [--json <out>]');
+  console.log('  compare --a <poses> --b <poses> [--open-end] [--json <out>]');
   console.log('  cut --draft <path> [--json <out>]');
   console.log('  bench [--check]               engine timings vs BUILD_PLAN 6.4 budgets');
   console.log('  process <video>               needs the macOS ffmpeg build (P1.7)');

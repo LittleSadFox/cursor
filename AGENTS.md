@@ -30,7 +30,7 @@ Phase IDs (P0.1, P2-A.5, …) in commits/PRs should match `BUILD_PLAN` §5.
 ```
 apps/web          React + Vite renderer (browser dev; later Electron)
 apps/server       Fastify local API (127.0.0.1)
-apps/cli          `coach` CLI: eval, detect, align, cut --draft, bench; video process waits on ffmpeg
+apps/cli          `coach` CLI: eval, detect, align, compare, cut --draft, bench; video process waits on ffmpeg
 apps/desktop      Electron `app://-` protocol + macOS menu (P2-A.4); packaging is P2-D
 packages/schema   Types, Zod, posebin/signals/labels (no deps but Zod)
 packages/engine   Pure algorithms — no I/O, no Node/DOM, no clocks/IDs

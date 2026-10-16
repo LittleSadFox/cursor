@@ -1,6 +1,8 @@
 import {
   FEATURE_NAMES,
   align,
+  alignFrames,
+  comparePostures,
   detectAttempts,
   globalMotion,
   preprocess,
@@ -52,8 +54,18 @@ export function syntheticFeatures(seconds: number, fps: number, pace: number): A
   });
 }
 
+function compareTracks(a: readonly PoseSample[], b: readonly PoseSample[]): void {
+  comparePostures(
+    { samples: a, moves: [] },
+    { samples: b, moves: [] },
+    align(alignFrames(a), alignFrames(b)),
+  );
+}
+
 export function runBench(): BenchResult[] {
   const track = syntheticTrack(600);
+  const climbA = syntheticTrack(60);
+  const climbB = syntheticTrack(66).slice(30);
   const a = syntheticFeatures(60, 30, 1);
   const b = syntheticFeatures(60, 30, 0.9);
   const [previous, next] = wallPan(2, 500_000, 3, 1);
@@ -67,6 +79,11 @@ export function runBench(): BenchResult[] {
       name: 'align two 60 s attempts @30 fps',
       ms: timeMs(() => align(a, b)),
       budgetMs: 300,
+    },
+    {
+      name: 'alignFrames + align + comparePostures, two 60 s tracks @15 fps',
+      ms: timeMs(() => compareTracks(climbA, climbB)),
+      budgetMs: null,
     },
     {
       name: 'globalMotion, one 160x90 frame pair',
