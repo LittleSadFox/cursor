@@ -8,13 +8,15 @@ Engineering plan: [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
 ## Current status
 
-Phase 0 foundations are on `main`. Phase 1 pure engine (no video decode yet):
+Phase 0–1 are on `main`. This branch adds Phase 2-A (training log homepage, no video ingest):
 
-- **P0.1–P0.4, P0.7** Scaffold, schema v1.0.0, capture protocol, label tool, synthetic `coach eval`
-- **P1.1–P1.6** Activity, pose preprocess, features, detection, review draft, moves, alignment
-- **P1.9** Synthetic climber fixtures (pose JSON, not fixture videos)
-- **P1.10** `coach detect`, `align`, `cut --draft`, `bench`. `process` waits on ffmpeg
-- **ADR-001 / ADR-002** Proposed (await bake-off / macOS ffmpeg proof)
+- **P2-A.1** SQLite schema (Drizzle), migrations, repositories, backup port
+- **P2-A.2** Core services + DAG job runner; `engine/stats` and `engine/grades`
+- **P2-A.3** Fastify API with auth, Host/Origin checks, problem+json, SSE, signed media URLs
+- **P2-A.4** Web shell (router, Lingui, settings, trash, first-run) and Electron `app://-` helpers
+- **P2-A.5** Homepage: today's log (prefill + override) and load / ACWR / volume / focus / pyramid charts
+
+Still blocked: P2-B ingest/review (ffmpeg, ADR-001, dataset), P2-C library/player, P2-D packaging.
 
 ## Develop
 
@@ -24,11 +26,15 @@ Requires Node 22+ and pnpm 10+.
 pnpm install
 pnpm build
 pnpm verify
-pnpm --filter @climbing-coach/web dev
-pnpm --filter @climbing-coach/server dev
+pnpm --filter @climbing-coach/server dev   # COACH_DEV=1: fixed dev-token + Vite origins
+pnpm --filter @climbing-coach/web dev      # sends dev-token unless VITE_COACH_TOKEN is set
 pnpm --filter @climbing-coach/cli exec node dist/main.js eval \
   --fixture datasets/fixtures/eval/baseline-synthetic.json
 ```
+
+Outside `COACH_DEV=1` the server generates a random per-launch token (the desktop shell passes
+its own in `COACH_TOKEN`) and only accepts the `app://-` origin. Set `COACH_LIBRARY` to point at
+a scratch library while developing.
 
 Useful scripts: `pnpm lint`, `pnpm typecheck`, `pnpm deps:check`, `pnpm verify`.
 

@@ -2,11 +2,18 @@
   "name": "@climbing-coach/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Electron shell for macOS arm64 (P2-A / P2-D). Placeholder package in P0.",
+  "type": "module",
+  "description": "Electron shell for macOS arm64 (P2-A / P2-D).",
   "scripts": {
-    "build": "node -e \"console.log('desktop packaging arrives in P2-D')\"",
-    "typecheck": "node -e \"process.exit(0)\"",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\""
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@climbing-coach/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@climbing-coach/config": "workspace:*"
   }
 }

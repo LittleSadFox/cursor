@@ -20,3 +20,22 @@ export function probeFfmpegStatus(): FfmpegStatus {
     note: 'Shipped ffmpeg arrives in P0.8 (ADR-002); not bundled yet.',
   };
 }
+
+export {
+  openSqliteLibrary,
+  sqliteExecutor,
+  type OpenedLibrary,
+  type OpenLibraryOptions,
+} from './sqlite.js';
+export { backupFileName, pruneBackups, KEEP_BACKUPS } from './backups.js';
+export { signMedia, verifyMedia } from './signed-url.js';
+export {
+  appConfigDir,
+  backupsDir,
+  defaultLibraryRoot,
+  libraryDbPath,
+  readLibraryPointer,
+  resolveUnderRoot,
+  writeLibraryPointer,
+} from './paths.js';
+export { nodeRandomBytes } from './random.js';

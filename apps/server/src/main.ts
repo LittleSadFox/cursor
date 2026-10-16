@@ -1,17 +1,103 @@
-import Fastify from 'fastify';
+import { randomBytes } from 'node:crypto';
 
 import { API_VERSION } from '@climbing-coach/api';
-import { createCoreApi } from '@climbing-coach/core';
+import {
+  appConfigDir,
+  backupsDir,
+  defaultLibraryRoot,
+  libraryDbPath,
+  nodeRandomBytes,
+  openSqliteLibrary,
+  readLibraryPointer,
+  writeLibraryPointer,
+} from '@climbing-coach/adapters-node';
+import {
+  createCoreApi,
+  createEventBus,
+  createIdGen,
+  systemClock,
+  type Logger,
+} from '@climbing-coach/core';
+
+import { launchConfig, resolveLibraryRoot } from './config.js';
+import { createApp } from './create-app.js';
+import { startScheduler } from './scheduler.js';
+
+const consoleLogger: Logger = {
+  info: (fields, message) => console.log(JSON.stringify({ level: 'info', message, ...fields })),
+  warn: (fields, message) => console.warn(JSON.stringify({ level: 'warn', message, ...fields })),
+  error: (fields, message) => console.error(JSON.stringify({ level: 'error', message, ...fields })),
+};
 
 async function main(): Promise<void> {
-  const api = createCoreApi();
-  const app = Fastify({ logger: true });
+  const config = launchConfig(process.env, (bytes) => randomBytes(bytes).toString('hex'));
+  const clock = systemClock();
+  const configDir = process.env.COACH_CONFIG_DIR || appConfigDir();
+  const libraryRoot = resolveLibraryRoot(
+    process.env,
+    readLibraryPointer(configDir),
+    defaultLibraryRoot(),
+  );
+  const opened = openSqliteLibrary(libraryDbPath(libraryRoot), clock.nowIso(), {
+    backupsDir: backupsDir(libraryRoot),
+  });
+  if (opened.preMigrationBackup)
+    consoleLogger.info({ path: opened.preMigrationBackup }, 'pre-migration backup');
 
-  app.get('/api/v1/health', async () => api.health());
+  let persistLibraryRoot = false;
+  const events = createEventBus(() => clock.nowMs());
+  const api = createCoreApi({
+    db: opened.db,
+    sql: opened.sql,
+    clock,
+    ids: createIdGen(clock, nodeRandomBytes),
+    events,
+    logger: consoleLogger,
+    backup: opened.backup,
+    ffmpegAvailable: false,
+    poseAvailable: false,
+    onLibraryRootChange: (root) => {
+      if (persistLibraryRoot) writeLibraryPointer(configDir, root);
+    },
+  });
 
-  const port = Number(process.env.PORT ?? 8787);
-  await app.listen({ host: '127.0.0.1', port });
-  app.log.info({ apiVersion: API_VERSION, port }, 'climbing-coach server listening');
+  // Settings reflect the library actually open; a COACH_LIBRARY override is not persisted.
+  if ((await api.system.getSettings()).libraryRoot !== libraryRoot) {
+    await api.system.updateSettings({ libraryRoot });
+  }
+  persistLibraryRoot = true;
+
+  const app = await createApp({
+    api,
+    events,
+    token: config.token,
+    allowedOrigins: config.allowedOrigins,
+    mediaSecret: config.mediaSecret,
+    libraryRoot,
+    logger: true,
+  });
+  const stopScheduler = startScheduler(api.jobsRunner, consoleLogger);
+  app.addHook('onClose', async () => {
+    stopScheduler();
+    opened.close();
+  });
+
+  await app.listen({ host: '127.0.0.1', port: config.port });
+  app.log.info(
+    {
+      apiVersion: API_VERSION,
+      port: config.port,
+      libraryRoot,
+      dev: config.dev,
+      tokenSource: config.tokenSource,
+    },
+    'climbing-coach server listening',
+  );
+  if (config.tokenSource === 'random') {
+    app.log.warn(
+      'no COACH_TOKEN given: generated a per-launch token; set COACH_DEV=1 for the dev token',
+    );
+  }
 }
 
 main().catch((err: unknown) => {

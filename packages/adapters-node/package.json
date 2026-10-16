@@ -18,9 +18,13 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@climbing-coach/schema": "workspace:*"
+    "@climbing-coach/core": "workspace:*",
+    "@climbing-coach/schema": "workspace:*",
+    "better-sqlite3": "^12.4.1",
+    "drizzle-orm": "^0.44.5"
   },
   "devDependencies": {
-    "@climbing-coach/config": "workspace:*"
+    "@climbing-coach/config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13"
   }
 }
