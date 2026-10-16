@@ -38,6 +38,14 @@ a scratch library while developing.
 
 Useful scripts: `pnpm lint`, `pnpm typecheck`, `pnpm deps:check`, `pnpm verify`.
 
+macOS arm64 only — LGPL ffmpeg (P0.8 / ADR-002, still Proposed until CI verify + signing run):
+
+```bash
+./scripts/ffmpeg/build-macos-arm64.sh
+./scripts/ffmpeg/download-samples.sh
+./scripts/ffmpeg/verify.sh
+```
+
 ## Layout
 
 See BUILD_PLAN §2.1. In short: `packages/schema|engine|api|core`, `apps/web|server|cli|desktop`,

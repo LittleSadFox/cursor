@@ -31,6 +31,8 @@ export type CoreDeps = {
   /** Library files (pose tracks, comparison results). Absent → those endpoints are NOT_FOUND. */
   blobs?: BlobStore;
   ffmpegAvailable?: boolean;
+  ffmpegVersion?: string | null;
+  ffmpegNote?: string;
   poseAvailable?: boolean;
   cpuCores?: number;
   onLibraryRootChange?: (root: string | null) => void;
@@ -64,6 +66,8 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
       ffmpegAvailable: deps.ffmpegAvailable === true,
       poseAvailable: deps.poseAvailable === true,
       onLibraryRootChange: deps.onLibraryRootChange,
+      ...(deps.ffmpegVersion !== undefined ? { ffmpegVersion: deps.ffmpegVersion } : {}),
+      ...(deps.ffmpegNote !== undefined ? { ffmpegNote: deps.ffmpegNote } : {}),
     }),
     ...createCatalogService({ db, clock, ids: deps.ids }),
     ...createTrainingService(db, clock),
