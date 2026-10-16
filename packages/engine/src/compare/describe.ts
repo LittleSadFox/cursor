@@ -29,8 +29,8 @@ const STRAIGHTENING: ReadonlySet<DivergenceChannel> = new Set([
 ]);
 
 function torsoAmount(value: number): string {
-  const rounded = Math.abs(value).toFixed(2).replace(/0$/, '');
-  return `${rounded} torso lengths`;
+  const rounded = Number(Math.abs(value).toFixed(2));
+  return `${rounded} torso ${rounded === 1 ? 'length' : 'lengths'}`;
 }
 
 function angleText(facts: DifferenceFacts): string {

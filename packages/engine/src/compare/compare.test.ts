@@ -387,6 +387,11 @@ describe('summaries and text', () => {
         meanDelta: -0.35,
       }),
     ).toBe('Center of mass 0.35 torso lengths further left over the support through move 1');
+    const hips = (meanDelta: number) =>
+      describeDifference({ moveIndexA: 0, joint: 'hipToHands', metric: 'torsoLengths', meanDelta });
+    expect(hips(1.001)).toBe('Hips 1 torso length further from the hands through move 1');
+    expect(hips(-1.5)).toBe('Hips 1.5 torso lengths closer to the hands through move 1');
+    expect(hips(0.1)).toBe('Hips 0.1 torso lengths further from the hands through move 1');
     expect(
       describeDifference({
         moveIndexA: 1,
