@@ -71,6 +71,7 @@ cleanup() {
   security list-keychains -d user -s $ORIG_KEYCHAINS >/dev/null 2>&1 || true
   security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
   rm -f "$P12"
+  rm -f "$PREFIX"/AuthKey_*.p8
 }
 trap cleanup EXIT
 
