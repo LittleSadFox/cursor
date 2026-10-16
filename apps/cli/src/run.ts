@@ -1,4 +1,4 @@
-import { alignCommand, cutCommand, detectCommand } from './commands/analysis.js';
+import { alignCommand, compareCommand, cutCommand, detectCommand } from './commands/analysis.js';
 import { benchCommand } from './commands/bench.js';
 import { evalCommand, printHelp, schemaCommand, versionCommand } from './commands/tooling.js';
 import { processCommand } from './commands/video.js';
@@ -16,6 +16,7 @@ const COMMANDS: Record<string, Command> = {
   eval: evalCommand,
   detect: detectCommand,
   align: alignCommand,
+  compare: compareCommand,
   cut: cutCommand,
   bench: benchCommand,
   process: processCommand,

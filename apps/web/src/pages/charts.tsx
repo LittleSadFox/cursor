@@ -14,7 +14,7 @@ import {
 import { useState } from 'react';
 
 import { type RangeKey } from '../dates.js';
-import { formatMessage } from '../format.js';
+import { translate } from '../format.js';
 import { useFocusTags, useSettings, useStats } from '../hooks/queries.js';
 import { focusCountsText, formatRatio } from './charts-copy.js';
 
@@ -51,7 +51,7 @@ export function HomeCharts() {
       <p className="lede">{i18n._('home.guidance')}</p>
       {weekly ? (
         <p>
-          {formatMessage(i18n._('home.weeklySummary'), {
+          {translate(i18n, 'home.weeklySummary', {
             label: i18n._('home.weekly'),
             sessions: weekly.sessions,
             load: weekly.totalLoad === null ? null : Math.round(weekly.totalLoad),
@@ -72,7 +72,7 @@ export function HomeCharts() {
         </ResponsiveContainer>
       </div>
       <p>
-        {formatMessage(i18n._('home.acwrValue'), {
+        {translate(i18n, 'home.acwrValue', {
           label: i18n._('home.acwr'),
           value: formatRatio(latest?.acwr ?? null),
           band: i18n._(`band.${latest?.band ?? 'insufficient_data'}`),
@@ -103,9 +103,7 @@ export function HomeCharts() {
       {pyramid.length === 0 ? <p className="lede">{i18n._('home.empty')}</p> : null}
       <ul>
         {pyramid.map((row) => (
-          <li key={`${row.discipline}:${row.grade}`}>
-            {formatMessage(i18n._('home.pyramidRow'), row)}
-          </li>
+          <li key={`${row.discipline}:${row.grade}`}>{translate(i18n, 'home.pyramidRow', row)}</li>
         ))}
       </ul>
     </section>

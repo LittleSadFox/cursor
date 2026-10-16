@@ -92,6 +92,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
       tsx:
         specifier: ^4.19.3
         version: 4.23.15
@@ -107,6 +110,9 @@ importers:
       '@lingui/core':
         specifier: ^6.9.1
         version: 6.9.1(@babel/core@7.29.7)
+      '@lingui/message-utils':
+        specifier: ^6.9.1
+        version: 6.9.1
       '@lingui/react':
         specifier: ^6.9.1
         version: 6.9.1(@babel/core@7.29.7)(react@19.3.1)
@@ -197,6 +203,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13

@@ -1,9 +1,9 @@
 /**
  * Starting detector parameters from BUILD_PLAN §2.4.
- * Version 0.1.0 is the untuned table. P1.11 (dev-split grid search) is blocked
+ * Version 0.2.0 is the untuned table plus comparison thresholds. P1.11 (dev-split grid search) is blocked
  * on the real climbing dataset, so these values are not yet a 1.0 release.
  */
-export const PARAMS_VERSION = '0.1.0';
+export const PARAMS_VERSION = '0.2.0';
 
 export const STARTING_PARAMS = {
   activity: {
@@ -59,6 +59,17 @@ export const STARTING_PARAMS = {
     restKeepFrames: 3,
     dtwBandFraction: 0.2,
     pcaComponents: 16,
+  },
+  compare: {
+    /** Divergence score units: this many degrees, or torso lengths, count as 1. */
+    angleScaleDeg: 30,
+    torsoScale: 0.5,
+    /** Per-move mean deltas below these are not reported as differences. */
+    minAngleDeltaDeg: 10,
+    minTorsoDelta: 0.15,
+    topDifferences: 3,
+    /** Score at or above which a joint is highlighted on the overlay. */
+    highlightScore: 0.5,
   },
   padding: {
     preUs: 2_000_000,

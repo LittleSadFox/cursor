@@ -51,9 +51,18 @@ module.exports = {
       name: 'core-allowed-deps',
       severity: 'error',
       comment: 'core may depend on schema, engine, and api only.',
-      from: { path: '^packages/core/src' },
+      from: { path: '^packages/core/src', pathNot: '(\\.test\\.ts$|^packages/core/src/test/)' },
       to: {
         path: '^packages/(?!core|schema|engine|api)',
+      },
+    },
+    {
+      name: 'core-tests-may-use-fixtures',
+      severity: 'error',
+      comment: 'core tests and test helpers may also use the synthetic fixtures.',
+      from: { path: '(^packages/core/src/.*\\.test\\.ts$|^packages/core/src/test/)' },
+      to: {
+        path: '^packages/(?!core|schema|engine|api|test-fixtures)',
       },
     },
     {

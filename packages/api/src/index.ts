@@ -120,7 +120,44 @@ export {
   type JobStep,
   type ResourceClass,
 } from './jobs.js';
+export {
+  AlignmentFeedbackSchema,
+  AlignmentVerdictSchema,
+  ComparisonDifferenceSchema,
+  ComparisonExportInputSchema,
+  ComparisonInputSchema,
+  ComparisonOptionsSchema,
+  ComparisonSchema,
+  ComparisonSideSchema,
+  ComparisonStatusSchema,
+  ComparisonSummarySchema,
+  MoveComparisonSchema,
+  MoveMatchSchema,
+  SpatialModeSchema,
+  VideoPoseQuerySchema,
+  type AlignmentFeedback,
+  type AlignmentVerdict,
+  type Comparison,
+  type ComparisonDifference,
+  type ComparisonExportInput,
+  type ComparisonInput,
+  type ComparisonOptions,
+  type ComparisonSide,
+  type ComparisonStatus,
+  type ComparisonSummary,
+  type MoveComparison,
+  type MoveMatch,
+  type SpatialMode,
+  type VideoPoseQuery,
+} from './comparisons.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
 export type { CoachApi, Crud } from './coach-api.js';
-export { createHttpCoachApi, problemFromUnknown, type HttpClientOptions } from './client.js';
+export {
+  createHttpCoachApi,
+  float32From,
+  int32From,
+  littleEndianBytes,
+  problemFromUnknown,
+  type HttpClientOptions,
+} from './client.js';
 export { runCoachApiConformance } from './conformance.js';

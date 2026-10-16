@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { MIGRATIONS, type Migration } from '@climbing-coach/core';
 
 import { backupFileName, pruneBackups } from './backups.js';
+import { libraryBlobs } from './blobs.js';
 import { readLibraryPointer, writeLibraryPointer } from './paths.js';
 import { openSqliteLibrary } from './sqlite.js';
 
@@ -101,5 +102,21 @@ describe('library pointer', () => {
     expect(readLibraryPointer(dir)).toBeNull();
     writeFileSync(join(dir, 'config.json'), '{not json');
     expect(readLibraryPointer(dir)).toBeNull();
+  });
+});
+
+describe('libraryBlobs', () => {
+  it('writes nested files atomically and reads them back', async () => {
+    const root = tempDir();
+    const blobs = libraryBlobs(root);
+    await blobs.write('comparisons/abc.bin', Uint8Array.from([1, 2, 3]));
+    expect(Array.from(await blobs.read('comparisons/abc.bin'))).toEqual([1, 2, 3]);
+    expect(readdirSync(join(root, 'comparisons'))).toEqual(['abc.bin']);
+  });
+
+  it('refuses paths outside the library root', async () => {
+    const blobs = libraryBlobs(tempDir());
+    await expect(blobs.read('../etc/passwd')).rejects.toThrow(/escapes the library/);
+    await expect(blobs.write('/tmp/x.bin', new Uint8Array(0))).rejects.toThrow(/escapes the library/);
   });
 });

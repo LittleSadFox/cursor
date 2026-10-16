@@ -3,6 +3,7 @@ import { silentLogger } from '../ports/logger.js';
 import { isoFromMs, type Clock } from '../ports/clock.js';
 import { createIdGen, sequentialRandomBytes } from '../ids/ulid.js';
 import { createCoreApi } from '../create-api.js';
+import type { BlobStore } from '../ports/blobs.js';
 import { openMemoryLibrary } from './memory-db.js';
 
 export function fakeClock(startMs = Date.parse('2026-10-15T12:00:00.000Z')): Clock & {
@@ -18,7 +19,22 @@ export function fakeClock(startMs = Date.parse('2026-10-15T12:00:00.000Z')): Clo
   };
 }
 
-export function createTestApi() {
+export function memoryBlobs(): BlobStore & { files: Map<string, Uint8Array> } {
+  const files = new Map<string, Uint8Array>();
+  return {
+    files,
+    read: async (path) => {
+      const bytes = files.get(path);
+      if (!bytes) throw new Error(`ENOENT: ${path}`);
+      return bytes;
+    },
+    write: async (path, bytes) => {
+      files.set(path, bytes);
+    },
+  };
+}
+
+export function createTestApi(options: { blobs?: BlobStore; ffmpegAvailable?: boolean } = {}) {
   const clock = fakeClock();
   const memory = openMemoryLibrary(clock.nowIso());
   const ids = createIdGen(clock, sequentialRandomBytes(1));
@@ -30,8 +46,9 @@ export function createTestApi() {
     ids,
     events,
     logger: silentLogger(),
-    ffmpegAvailable: false,
+    ffmpegAvailable: options.ffmpegAvailable ?? false,
     poseAvailable: false,
+    ...(options.blobs ? { blobs: options.blobs } : {}),
   });
   return { api, clock, memory, events };
 }

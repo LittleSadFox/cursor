@@ -24,7 +24,10 @@ export async function runCoachApiConformance(api: CoachApi): Promise<void> {
   assert(gym.version === 1, 'gym version');
 
   const listed = await api.gyms.list();
-  assert(listed.items.some((item) => item.id === gym.id), 'gym listed');
+  assert(
+    listed.items.some((item) => item.id === gym.id),
+    'gym listed',
+  );
 
   const renamed = await api.gyms.update(gym.id, { name: 'Renamed Gym', expectedVersion: 1 });
   assert(renamed.name === 'Renamed Gym', 'gym renamed');
@@ -55,7 +58,10 @@ export async function runCoachApiConformance(api: CoachApi): Promise<void> {
   assert(session.date === '2026-10-15', 'session date');
 
   const tags = await api.focusTags.list();
-  assert(tags.some((tag) => tag.id === 'strength' && tag.builtin), 'builtin focus tags');
+  assert(
+    tags.some((tag) => tag.id === 'strength' && tag.builtin),
+    'builtin focus tags',
+  );
 
   const day = await api.trainingLogs.get('2026-10-15');
   assert(day.entry === null, 'empty day');
@@ -88,7 +94,10 @@ export async function runCoachApiConformance(api: CoachApi): Promise<void> {
 
   await api.gyms.remove(gym.id);
   const trash = await api.trash.list();
-  assert(trash.some((item) => item.kind === 'gym' && item.id === gym.id), 'gym in trash');
+  assert(
+    trash.some((item) => item.kind === 'gym' && item.id === gym.id),
+    'gym in trash',
+  );
   await api.trash.restore('gym', gym.id);
   const restored = await api.gyms.get(gym.id);
   assert(restored.name === 'Renamed Gym', 'restored gym');
@@ -100,4 +109,36 @@ export async function runCoachApiConformance(api: CoachApi): Promise<void> {
     missing = error instanceof ProblemError && error.problem.code === 'NOT_FOUND';
   }
   assert(missing, 'unknown gym is NOT_FOUND');
+
+  assert(
+    (await problemCodeOf(api.comparisons.get('01ARZ3NDEKTSV4RRFFQ69G5FAV'))) === 'NOT_FOUND',
+    'unknown comparison is NOT_FOUND',
+  );
+  assert(
+    (await problemCodeOf(
+      api.comparisons.create({
+        attemptAId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        attemptBId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      }),
+    )) === 'NOT_FOUND',
+    'comparing unknown attempts is NOT_FOUND',
+  );
+  assert(
+    (await problemCodeOf(
+      api.comparisons.create({
+        attemptAId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        attemptBId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      }),
+    )) === 'VALIDATION_FAILED',
+    'comparing an attempt with itself is a validation problem',
+  );
+}
+
+async function problemCodeOf(promise: Promise<unknown>): Promise<string | null> {
+  try {
+    await promise;
+    return null;
+  } catch (error) {
+    return error instanceof ProblemError ? error.problem.code : null;
+  }
 }

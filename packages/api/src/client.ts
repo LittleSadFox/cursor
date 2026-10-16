@@ -1,6 +1,7 @@
 import type { Boulder, BoulderInput, BoulderListQuery, BoulderPatch } from './boulders.js';
 import type { CoachApi } from './coach-api.js';
 import type { Accepted, Id, Page } from './common.js';
+import { ComparisonSchema, type Comparison } from './comparisons.js';
 import type { Gym, GymInput, GymPatch } from './gyms.js';
 import { HealthResponseSchema } from './health.js';
 import type { Job, JobQuery } from './jobs.js';
@@ -25,10 +26,7 @@ export type HttpClientOptions = {
 
 function problemFromBody(status: number, body: unknown): ProblemError {
   if (isProblem(body)) return new ProblemError(body.code as ProblemCode, body.detail, body.errors);
-  return new ProblemError(
-    status === 401 ? 'UNAUTHORIZED' : 'VALIDATION_FAILED',
-    `HTTP ${status}`,
-  );
+  return new ProblemError(status === 401 ? 'UNAUTHORIZED' : 'VALIDATION_FAILED', `HTTP ${status}`);
 }
 
 export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
@@ -61,10 +59,35 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
     return json as T;
   }
 
+  async function requestBytes(
+    path: string,
+    query?: Record<string, string | number | boolean | undefined>,
+  ): Promise<Uint8Array> {
+    const url = new URL(`${prefix}${path}`);
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value !== undefined) url.searchParams.set(key, String(value));
+    }
+    const response = await fetchImpl(url, {
+      headers: { Authorization: `Bearer ${options.token}` },
+    });
+    if (!response.ok) {
+      throw problemFromBody(response.status, await response.json().catch(() => null));
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  const comparison = async (method: string, path: string, body?: unknown): Promise<Comparison> =>
+    ComparisonSchema.parse(await request(method, path, body));
+
   function crud<T, Input, Patch>(base: string) {
     return {
       list: (q?: Record<string, unknown>) =>
-        request<Page<T>>('GET', base, undefined, q as Record<string, string | number | boolean | undefined>),
+        request<Page<T>>(
+          'GET',
+          base,
+          undefined,
+          q as Record<string, string | number | boolean | undefined>,
+        ),
       create: (input: Input) => request<T>('POST', base, input),
       get: (id: Id) => request<T>('GET', `${base}/${id}`),
       update: (id: Id, patch: Patch) => request<T>('PATCH', `${base}/${id}`, patch),
@@ -83,13 +106,19 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
       ...crud<Boulder, BoulderInput, BoulderPatch>('/boulders'),
       progress: (id: Id) => request('GET', `/boulders/${id}/progress`),
       list: (q?: BoulderListQuery) =>
-        request('GET', '/boulders', undefined, q as Record<string, string | number | boolean | undefined>),
+        request(
+          'GET',
+          '/boulders',
+          undefined,
+          q as Record<string, string | number | boolean | undefined>,
+        ),
     },
     sessions: crud<Session, SessionInput, SessionPatch>('/sessions'),
     trainingLogs: {
       list: (range) => request('GET', '/training-logs', undefined, range),
       get: (date) => request<TrainingLogDay>('GET', `/training-logs/${date}`),
-      put: (date, input: TrainingLogInput) => request<TrainingLog>('PUT', `/training-logs/${date}`, input),
+      put: (date, input: TrainingLogInput) =>
+        request<TrainingLog>('PUT', `/training-logs/${date}`, input),
       remove: (date) => request<void>('DELETE', `/training-logs/${date}`),
     },
     focusTags: {
@@ -105,16 +134,36 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
         request<FocusBucket[]>('GET', '/stats/focus-distribution', undefined, { ...range, bucket }),
       gradePyramid: (range, discipline: 'boulder' | 'route') =>
         request<GradeCount[]>('GET', '/stats/grade-pyramid', undefined, { ...range, discipline }),
-      weeklySummary: (week) => request<WeeklySummary>('GET', '/stats/weekly-summary', undefined, { week }),
+      weeklySummary: (week) =>
+        request<WeeklySummary>('GET', '/stats/weekly-summary', undefined, { week }),
     },
     trash: {
       list: () => request('GET', '/trash'),
       restore: (kind: TrashKind, id: string) => request('POST', `/trash/${kind}/${id}/restore`),
       purge: (kind: TrashKind, id: string) => request('DELETE', `/trash/${kind}/${id}`),
     },
+    videos: {
+      pose: (id, q) =>
+        requestBytes(`/videos/${id}/pose`, q as Record<string, string | number | undefined>),
+    },
+    comparisons: {
+      create: (input) => comparison('POST', '/comparisons', input),
+      get: (id) => comparison('GET', `/comparisons/${id}`),
+      warp: async (id) => int32From(await requestBytes(`/comparisons/${id}/warp`)),
+      divergence: async (id) => float32From(await requestBytes(`/comparisons/${id}/divergence`)),
+      feedback: async (id, feedback) => {
+        await request('POST', `/comparisons/${id}/feedback`, feedback);
+      },
+      export: (id, input) => request<Accepted>('POST', `/comparisons/${id}/export`, input),
+    },
     jobs: {
       list: (q?: JobQuery) =>
-        request<Job[]>('GET', '/jobs', undefined, q as Record<string, string | number | boolean | undefined>),
+        request<Job[]>(
+          'GET',
+          '/jobs',
+          undefined,
+          q as Record<string, string | number | boolean | undefined>,
+        ),
       get: (id) => request<Job>('GET', `/jobs/${id}`),
       cancel: (id) => request('POST', `/jobs/${id}/cancel`),
       retry: (id) => request<Accepted>('POST', `/jobs/${id}/retry`),
@@ -125,6 +174,30 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
       },
     },
   };
+}
+
+/** Little-endian typed views; copies so the result is aligned whatever the source offset. */
+export function int32From(bytes: Uint8Array): Int32Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return Int32Array.from({ length: Math.floor(bytes.byteLength / 4) }, (_, i) =>
+    view.getInt32(i * 4, true),
+  );
+}
+
+export function float32From(bytes: Uint8Array): Float32Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return Float32Array.from({ length: Math.floor(bytes.byteLength / 4) }, (_, i) =>
+    view.getFloat32(i * 4, true),
+  );
+}
+
+/** Little-endian bytes for binary responses; the inverse of `int32From` / `float32From`. */
+export function littleEndianBytes(values: Int32Array | Float32Array): Uint8Array {
+  const out = new Uint8Array(values.length * 4);
+  const view = new DataView(out.buffer);
+  const set = values instanceof Int32Array ? view.setInt32.bind(view) : view.setFloat32.bind(view);
+  values.forEach((value, i) => set(i * 4, value, true));
+  return out;
 }
 
 export function problemFromUnknown(error: unknown): Problem | null {

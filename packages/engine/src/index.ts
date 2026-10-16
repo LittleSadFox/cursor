@@ -2,7 +2,7 @@
  * Pure analysis algorithms (PLAN 2.1–2.9, 2.11).
  * Video decode and the pose runtime stay in adapters (P1.7, P1.8).
  */
-export const ENGINE_VERSION = '0.1.0';
+export const ENGINE_VERSION = '0.2.0';
 
 export { PARAMS_VERSION, STARTING_PARAMS, type StartingParams } from './params.js';
 export { clamp, median } from './math.js';
@@ -31,6 +31,7 @@ export { fillGaps, type GapFillParams } from './pose/gaps.js';
 export { normalize } from './pose/normalize.js';
 export { bodyMetrics, estimateBodyHeight, type BodyMetrics } from './pose/metrics.js';
 export { preprocess, type PreprocessParams } from './pose/preprocess.js';
+export { trackSamples } from './pose/from-track.js';
 
 export { FEATURE_SPEC, FEATURE_SPEC_VERSION, FEATURE_NAMES } from './features/spec.js';
 export {
@@ -85,6 +86,72 @@ export { collapseRests, type RestCollapseParams } from './align/rest.js';
 export { bandedDtw, openEndDtw, type DtwResult, type DtwStep } from './align/dtw.js';
 export { reduceFeatures } from './align/pca.js';
 export { align, type AlignFrame, type AlignOptions, type AlignResult } from './align/align.js';
+export { alignFrames } from './align/frames.js';
+export {
+  alignAttempts,
+  openEndSide,
+  type AttemptAlignOptions,
+  type OpenEndSide,
+} from './align/attempts.js';
+
+export {
+  CHANNEL_COUNT,
+  COMPARE_JOINTS,
+  COMPOSITE_METRICS,
+  DIVERGENCE_CHANNELS,
+  JOINT_TRIPLETS,
+  channelMetric,
+  type ChannelMetric,
+  type CompareJoint,
+  type CompositeMetric,
+  type DivergenceChannel,
+} from './compare/channels.js';
+export { centerOfMass, hipToHands, jointAnglesDeg } from './compare/posture.js';
+export {
+  comSupportOffset,
+  contactsAt,
+  convexHull,
+  polygonDistance,
+  type Point2,
+  type SupportOffset,
+} from './compare/support.js';
+export {
+  channelScale,
+  divergenceScore,
+  divergenceSeries,
+  highlightedJoints,
+  jointAngleDeltas,
+  nearestIndex,
+  postureRow,
+  postureRows,
+  warpIndices,
+  type CompareParams,
+  type DivergenceSeries,
+  type PostureRows,
+} from './compare/divergence.js';
+export { describeDifference, type DifferenceFacts } from './compare/describe.js';
+export {
+  moveDifferences,
+  summarizeByMove,
+  topDifferences,
+  type ComparisonSummary,
+  type Difference,
+  type MoveSummary,
+} from './compare/summary.js';
+export {
+  counterpartOf,
+  mappedSpanB,
+  warpMoveMatches,
+  type MoveMatch,
+  type Span,
+} from './compare/matches.js';
+export {
+  comparePostures,
+  type CompareSide,
+  type ComparisonResult,
+  type MoveResult,
+} from './compare/compare.js';
+export { compareSideOf, type BuiltSide } from './compare/side.js';
 
 export {
   GRADE_SYSTEMS,

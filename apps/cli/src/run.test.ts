@@ -102,13 +102,26 @@ describe('coach commands', () => {
     expect(JSON.parse(out[0] ?? '{}')).toEqual({ cost: 0, steps: 20 });
   });
 
-  it('reports engine timings against the BUILD_PLAN budgets', () => {
+  it('compares a pose track with itself as zero divergence', () => {
+    const poses = tempFile('poses.json', { samples: standClimbFall().samples });
+    const { out } = capture(['compare', '--a', poses, '--b', poses]);
+    const body = JSON.parse(out[0] ?? '{}') as {
+      steps: number;
+      summary: { meanDivergence: number; topDifferences: unknown[] };
+    };
+    expect(body.steps).toBeGreaterThan(0);
+    expect(body.summary).toEqual({ meanDivergence: 0, topDifferences: [] });
+    expect(capture(['compare', '--a', poses]).exitCode).toBe(1);
+  });
+
+  // `bench` times full-size workloads (warm-up + 3 runs each); CI runners need well over 5 s.
+  it('reports engine timings against the BUILD_PLAN budgets', { timeout: 30_000 }, () => {
     const { out } = capture(['bench']);
     const body = JSON.parse(out[0] ?? '{}') as {
       results: { name: string; ms: number; budgetMs: number | null }[];
       withinBudget: boolean;
     };
-    expect(body.results.map((result) => result.budgetMs)).toEqual([1000, 300, null]);
+    expect(body.results.map((result) => result.budgetMs)).toEqual([1000, 300, null, null]);
     body.results.forEach((result) => expect(result.ms).toBeGreaterThan(0));
     expect(typeof body.withinBudget).toBe('boolean');
   });

@@ -8,7 +8,7 @@ import {
   type TrainingLogDay,
 } from '@climbing-coach/api';
 
-import { errorText } from '../format.js';
+import { errorText, translate } from '../format.js';
 import { useFocusTags, useSaveToday, useSettings, useToday } from '../hooks/queries.js';
 import { GradeBreakdownEditor } from './grade-breakdown.js';
 import { formatPrefillBasis } from './prefill-copy.js';
@@ -60,7 +60,7 @@ function TodayEditor({ day, save }: { day: TrainingLogDay; save: SaveToday }) {
       <p className="lede">
         {formatPrefillBasis(
           day.prefill.basis,
-          i18n._('home.prefillBasis'),
+          (values) => translate(i18n, 'home.prefillBasis', values),
           i18n._('home.noPrefill'),
         )}
       </p>

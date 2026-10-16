@@ -68,6 +68,33 @@ describe('applyMigrations', () => {
   });
 });
 
+describe('0002 comparisons', () => {
+  it('upgrades a 0001 library that already has a comparison row', () => {
+    const exec = executor(new Database(':memory:'));
+    applyMigrations(exec, NOW, { migrations: MIGRATIONS.slice(0, 1) });
+    exec.run(
+      `INSERT INTO comparisons (id, attempt_a_id, attempt_b_id, pose_model, engine_version,
+        options_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['c1', 'a', 'b', 'm@1', '0.1.0', 'h', NOW, NOW],
+    );
+    expect(applyMigrations(exec, NOW)).toEqual(['0002_comparisons']);
+    expect(exec.get('SELECT status, job_id, options_json FROM comparisons')).toEqual({
+      status: 'pending',
+      job_id: null,
+      options_json: '{}',
+    });
+    const duplicate = () =>
+      exec.run(
+        `INSERT INTO comparisons (id, attempt_a_id, attempt_b_id, pose_model, engine_version,
+          options_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['c2', 'a', 'b', 'm@1', '0.1.0', 'h', NOW, NOW],
+      );
+    expect(duplicate).toThrow(/UNIQUE/);
+    exec.run("UPDATE comparisons SET deleted_at = ? WHERE id = 'c1'", [NOW]);
+    expect(duplicate).not.toThrow();
+  });
+});
+
 describe('embedded migrations', () => {
   it('match the .sql sources (run `pnpm --filter @climbing-coach/core migrations:embed`)', () => {
     for (const migration of MIGRATIONS) {
