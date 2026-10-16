@@ -105,7 +105,7 @@ jobs:
           path: |
             vendor/ffmpeg/.cache
             vendor/ffmpeg/darwin-arm64
-          key: ffmpeg-darwin-arm64-${{ hashFiles('scripts/ffmpeg/versions.env', 'scripts/ffmpeg/configure-lgpl.sh', 'scripts/ffmpeg/build-macos-arm64.sh') }}
+          key: ffmpeg-darwin-arm64-${{ hashFiles('scripts/ffmpeg/versions.env', 'scripts/ffmpeg/configure-lgpl.sh', 'scripts/ffmpeg/build-macos-arm64.sh', 'scripts/ffmpeg/common.sh') }}
 
       - name: Build LGPL ffmpeg + ffprobe
         run: bash scripts/ffmpeg/build-macos-arm64.sh

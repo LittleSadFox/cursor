@@ -20,14 +20,25 @@ export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET}"
 mkdir -p "$PREFIX/bin" "$CACHE" "$DEPS" "$SRC"
 
 if [[ -x "$PREFIX/bin/ffmpeg" && -x "$PREFIX/bin/ffprobe" && -f "$PREFIX/BUILD.json" ]]; then
+  LGPL_FLAGS="$(printf '%s\n' "${FFMPEG_LGPL_CONFIGURE_FLAGS[@]}")"
+  export LGPL_FLAGS
   if python3 - "$PREFIX/BUILD.json" "$FFMPEG_VERSION" "$ZIMG_VERSION" <<'PY'; then
-import json, sys
+import json, os, sys
 meta = json.load(open(sys.argv[1]))
-sys.exit(0 if meta.get("ffmpegVersion") == sys.argv[2] and meta.get("zimgVersion") == sys.argv[3] else 1)
+want = [line for line in os.environ["LGPL_FLAGS"].splitlines() if line]
+got = meta.get("configureFlags") or []
+sys.exit(
+    0
+    if meta.get("ffmpegVersion") == sys.argv[2]
+    and meta.get("zimgVersion") == sys.argv[3]
+    and got == want
+    else 1
+)
 PY
-    log "reusing $PREFIX (ffmpeg $FFMPEG_VERSION, zimg $ZIMG_VERSION)"
+    log "reusing $PREFIX (ffmpeg $FFMPEG_VERSION, zimg $ZIMG_VERSION, same LGPL flags)"
     exit 0
   fi
+  log "cached prefix is stale (version or configure flags changed); rebuilding"
 fi
 
 if ! command -v pkg-config >/dev/null 2>&1 || ! command -v autoreconf >/dev/null 2>&1; then
@@ -90,6 +101,8 @@ export FFMPEG_TARBALL_URL FFMPEG_TARBALL_SHA256 ZIMG_TARBALL_URL ZIMG_TARBALL_SH
 config_line="$("$PREFIX/bin/ffmpeg" -hide_banner -version | awk '/^configuration:/{print; exit}')"
 export BUILD_PREFIX="$PREFIX"
 export BUILD_CONFIG="${config_line#configuration: }"
+LGPL_FLAGS="$(printf '%s\n' "${FFMPEG_LGPL_CONFIGURE_FLAGS[@]}")"
+export LGPL_FLAGS
 python3 <<'PY'
 import json, os, pathlib
 path = pathlib.Path(os.environ["BUILD_PREFIX"]) / "BUILD.json"
@@ -103,6 +116,7 @@ path.write_text(
             "gpl": False,
             "nonfree": False,
             "macosxDeploymentTarget": os.environ["MACOSX_DEPLOYMENT_TARGET"],
+            "configureFlags": [line for line in os.environ["LGPL_FLAGS"].splitlines() if line],
             "configure": os.environ["BUILD_CONFIG"].split(),
             "source": {
                 "ffmpeg": {
