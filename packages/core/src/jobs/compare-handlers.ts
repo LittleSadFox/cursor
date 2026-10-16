@@ -15,19 +15,22 @@ import type { BlobStore } from '../ports/blobs.js';
 import type { Clock } from '../ports/clock.js';
 import type { EventBus } from '../ports/events.js';
 import type { AppDatabase } from '../ports/sql.js';
+import { jobScratch, type JobScratch } from './scratch.js';
 import type { StepContext, StepHandler } from './types.js';
+
+export type CompareWork = {
+  sides?: [LoadedSide, LoadedSide];
+  alignment?: AlignResult;
+  result?: ComparisonResult;
+};
 
 export type CompareHandlerDeps = {
   db: AppDatabase;
   clock: Clock;
   events: EventBus;
   blobs?: BlobStore | undefined;
-};
-
-type Work = {
-  sides?: [LoadedSide, LoadedSide];
-  alignment?: AlignResult;
-  result?: ComparisonResult;
+  /** Per-job intermediate results; defaults to one dropped when the job ends. */
+  scratch?: JobScratch<CompareWork>;
 };
 
 export function comparisonPath(id: string): string {
@@ -47,7 +50,7 @@ function comparisonIdOf(ctx: StepContext): string {
  * recomputes them from the stored pose tracks.
  */
 export function compareHandlers(deps: CompareHandlerDeps): Record<string, StepHandler> {
-  const work = new Map<string, Work>();
+  const work = deps.scratch ?? jobScratch<CompareWork>(deps.events, 'compare', () => ({}));
 
   function blobs(): BlobStore {
     if (!deps.blobs) throw new Error('library storage is not configured');
@@ -87,14 +90,9 @@ export function compareHandlers(deps: CompareHandlerDeps): Record<string, StepHa
     return state.result;
   }
 
-  function stateOf(ctx: StepContext): Work {
+  function stateOf(ctx: StepContext): CompareWork {
     ctx.signal.throwIfAborted();
-    let state = work.get(ctx.job.id);
-    if (!state) {
-      state = {};
-      work.set(ctx.job.id, state);
-    }
-    return state;
+    return work.of(ctx.job.id);
   }
 
   async function writeResult(ctx: StepContext): Promise<{ comparisonId: string; steps: number }> {
@@ -110,7 +108,7 @@ export function compareHandlers(deps: CompareHandlerDeps): Record<string, StepHa
       resultPath: path,
       result: resultJson(a, result),
     });
-    work.delete(ctx.job.id);
+    work.drop(ctx.job.id);
     deps.events.publish({ type: 'comparison.ready', comparisonId: id });
     return { comparisonId: id, steps: result.score.length };
   }
@@ -122,7 +120,7 @@ export function compareHandlers(deps: CompareHandlerDeps): Record<string, StepHa
       try {
         return await step(ctx);
       } catch (error) {
-        work.delete(ctx.job.id);
+        work.drop(ctx.job.id);
         throw error;
       }
     };
