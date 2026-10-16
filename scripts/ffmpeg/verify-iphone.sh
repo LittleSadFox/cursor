@@ -15,7 +15,7 @@ CI cannot see the private originals. Do not commit user footage.
   # Directory of ready .MOV / .mov files:
   IPHONE_SAMPLES_DIR=/path/to/clips ./scripts/ffmpeg/verify-iphone.sh
 
-  # Raw store (may contain IMG_7907.mov.part-00 …); reassembles into a temp dir:
+  # Raw store (files over 100 MiB are NAME.ext.part-00 …); reassembles every set:
   ./scripts/ffmpeg/verify-iphone.sh --from-store /path/to/datasets/raw
 
 Rejoin parts yourself if you prefer:
@@ -81,10 +81,18 @@ if [[ -n "$STORE" ]]; then
   fi
   CLIPS_DIR="$(mktemp -d /tmp/coach-iphone-clips.XXXXXX)"
   cleanup_clips="$CLIPS_DIR"
-  if [[ -f "$STORE/IMG_7907.mov.part-00" ]]; then
-    cat "$STORE"/IMG_7907.mov.part-* >"$CLIPS_DIR/IMG_7907.mov"
-    record "rejoined IMG_7907.mov from parts in $STORE"
-  fi
+  # Store files over 100 MiB are split as NAME.ext.part-NN. Rejoin every set, not just IMG_7907.
+  while IFS= read -r first_part; do
+    [[ -n "$first_part" && -f "$first_part" ]] || continue
+    local_base="${first_part%.part-00}"
+    dest="$CLIPS_DIR/$(basename "$local_base")"
+    : >"$dest"
+    while IFS= read -r part; do
+      [[ -f "$part" ]] || continue
+      cat "$part" >>"$dest"
+    done < <(find "$STORE" -maxdepth 1 -type f -name "$(basename "$local_base").part-*" | LC_ALL=C sort)
+    record "rejoined $(basename "$dest") from parts in $STORE"
+  done < <(find "$STORE" -maxdepth 1 -type f -name '*.part-00' | LC_ALL=C sort)
   local_copy=0
   while IFS= read -r src; do
     [[ -f "$src" ]] || continue
@@ -94,7 +102,7 @@ if [[ -n "$STORE" ]]; then
     fi
     local_copy=1
   done < <(list_iphone_clips "$STORE")
-  if [[ "$local_copy" -eq 0 && ! -f "$CLIPS_DIR/IMG_7907.mov" ]]; then
+  if [[ "$local_copy" -eq 0 ]] && ! find "$CLIPS_DIR" -maxdepth 1 -type f \( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.m4v' \) | grep -q .; then
     echo "no .mov/.MOV clips or parts in $STORE" >&2
     exit 1
   fi
