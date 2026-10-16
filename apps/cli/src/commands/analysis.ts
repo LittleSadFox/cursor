@@ -1,11 +1,11 @@
 import {
   STARTING_PARAMS,
   align,
-  alignFrames,
+  alignAttempts,
   clipRangeOf,
   comparePostures,
+  compareSideOf,
   detectAttempts,
-  segmentMoves,
   validateDraft,
   type PoseSample,
 } from '@climbing-coach/engine';
@@ -48,19 +48,22 @@ function wholeRange(samples: readonly PoseSample[]): { startUs: number; endUs: n
   };
 }
 
-/** Align two pose tracks, then compare postures (P3.1). Each file is one attempt's climb. */
+/**
+ * Align two pose tracks, then compare postures (P3.1) the way the compare job does.
+ * Each file is one attempt's climb; `--open-end` means A ended early (a fall).
+ */
 export function compareCommand(args: readonly string[]): void {
   const a = flagValue(args, 'a');
   const b = flagValue(args, 'b');
   if (!a || !b) return usage('coach compare --a <poses> --b <poses> [--open-end] [--json <out>]');
   const samplesA = loadPoses(a);
   const samplesB = loadPoses(b);
-  const alignment = align(alignFrames(samplesA), alignFrames(samplesB), {
-    openEnd: hasFlag(args, 'open-end'),
+  const alignment = alignAttempts(samplesA, samplesB, {
+    openEnd: hasFlag(args, 'open-end') ? 'a' : 'none',
   });
   const result = comparePostures(
-    { samples: samplesA, moves: segmentMoves(samplesA, wholeRange(samplesA)) },
-    { samples: samplesB, moves: segmentMoves(samplesB, wholeRange(samplesB)) },
+    compareSideOf(samplesA, wholeRange(samplesA)),
+    compareSideOf(samplesB, wholeRange(samplesB)),
     alignment,
   );
   const body = {

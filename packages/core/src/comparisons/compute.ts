@@ -2,13 +2,11 @@ import type { ComparisonOptions, ComparisonSide, MoveComparison } from '@climbin
 import {
   CHANNEL_COUNT,
   DIVERGENCE_CHANNELS,
-  MOVE_LIMBS,
   alignAttempts,
   comparePostures,
+  compareSideOf,
   openEndSide,
   preprocess,
-  segmentMoves,
-  stationaryPeriods,
   trackSamples,
   type AlignResult,
   type ComparisonResult,
@@ -42,9 +40,7 @@ export function loadSide(
 ): LoadedSide {
   const climb = climbOf(side);
   const samples = preprocess(trackSamples(readPosebin(posebin), climb)).image;
-  const moves = storedMoves.length > 0 ? [...storedMoves] : segmentMoves(samples, climb);
-  const contacts = MOVE_LIMBS.flatMap((limb) => stationaryPeriods(samples, limb, climb));
-  return { side, samples, moves, contacts };
+  return { side, ...compareSideOf(samples, climb, storedMoves), samples };
 }
 
 export function alignSides(a: LoadedSide, b: LoadedSide, options: ComparisonOptions): AlignResult {
@@ -59,11 +55,7 @@ export function compareSides(
   b: LoadedSide,
   alignment: AlignResult,
 ): ComparisonResult {
-  return comparePostures(
-    { samples: a.samples, moves: a.moves, contacts: a.contacts },
-    { samples: b.samples, moves: b.moves, contacts: b.contacts },
-    alignment,
-  );
+  return comparePostures(a, b, alignment);
 }
 
 function finiteOrNull(value: number | undefined): number | null {
