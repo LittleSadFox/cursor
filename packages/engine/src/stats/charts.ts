@@ -1,4 +1,4 @@
-import { toDifficultyIndex } from '../grades/convert.js';
+import { compareGrades, gradeIndexFor } from '../grades/order.js';
 import type { GradeSystem } from '../grades/systems.js';
 
 import { daysBetween, isoMonth, isoWeek } from './dates.js';
@@ -13,10 +13,7 @@ import type {
   WeeklySummary,
 } from './types.js';
 
-export function exertionVolume(
-  logs: readonly DailyLog[],
-  range: DateRange,
-): ExertionVolumePoint[] {
+export function exertionVolume(logs: readonly DailyLog[], range: DateRange): ExertionVolumePoint[] {
   return logs
     .filter((log) => log.date >= range.from && log.date <= range.to)
     .map((log) => ({
@@ -72,7 +69,37 @@ export function gradePyramid(
       byGrade.set(row.grade, existing);
     }
   }
-  return [...byGrade.values()].sort((a, b) => a.grade.localeCompare(b.grade));
+  return [...byGrade.values()].sort((a, b) => compareGrades(a.grade, b.grade, discipline));
+}
+
+function hardestSendIn(
+  logs: readonly DailyLog[],
+  discipline: Discipline,
+  gradeSystem: GradeSystem,
+): string | null {
+  let hardest: string | null = null;
+  let hardestIndex = -Infinity;
+  for (const log of logs) {
+    for (const row of log.grades) {
+      if (row.discipline !== discipline || row.sent <= 0) continue;
+      const index = gradeIndexFor(row.grade, discipline, gradeSystem);
+      if (index !== null && index > hardestIndex) {
+        hardestIndex = index;
+        hardest = row.grade;
+      }
+    }
+  }
+  return hardest;
+}
+
+function daysSinceLastRest(logs: readonly DailyLog[], asOf: string | undefined): number | null {
+  if (asOf === undefined) return null;
+  let lastRest: string | null = null;
+  for (const log of logs) {
+    if (!log.rest || log.date > asOf) continue;
+    if (lastRest === null || log.date > lastRest) lastRest = log.date;
+  }
+  return lastRest === null ? null : daysBetween(lastRest, asOf);
 }
 
 export function weeklySummary(
@@ -85,29 +112,16 @@ export function weeklySummary(
   const loads = inWeek.map(sessionLoad).filter((value): value is number => value !== null);
   const totalLoad = loads.length === 0 ? null : loads.reduce((sum, n) => sum + n, 0);
 
-  let hardestSend: string | null = null;
-  let hardestIndex = -Infinity;
-  for (const log of inWeek) {
-    for (const row of log.grades) {
-      if (row.sent <= 0) continue;
-      const index = toDifficultyIndex(row.grade, row.discipline === 'boulder' ? gradeSystem : 'yds');
-      if (index === null) continue;
-      if (index > hardestIndex) {
-        hardestIndex = index;
-        hardestSend = row.grade;
-      }
-    }
-  }
+  // Boulder and route indices are on different scales, so a route send only counts when
+  // there was no boulder send that week.
+  const hardestSend =
+    hardestSendIn(inWeek, 'boulder', gradeSystem) ?? hardestSendIn(inWeek, 'route', gradeSystem);
 
-  const restDays = logs.filter((log) => log.rest).map((log) => log.date).sort();
-  const weekLogs = inWeek.map((log) => log.date).sort();
-  const weekEnd = weekLogs[weekLogs.length - 1];
-  const lastRest = restDays.reduce<string | null>((latest, date) => {
-    if (weekEnd !== undefined && date > weekEnd) return latest;
-    return date;
-  }, null);
-  const daysSinceRest =
-    lastRest === null || weekEnd === undefined ? null : daysBetween(lastRest, weekEnd);
+  const lastLoggedInWeek = inWeek.reduce<string | undefined>(
+    (latest, log) => (latest === undefined || log.date > latest ? log.date : latest),
+    undefined,
+  );
+  const daysSinceRest = daysSinceLastRest(logs, lastLoggedInWeek);
 
   return { week, sessions, totalLoad, hardestSend, daysSinceRest };
 }

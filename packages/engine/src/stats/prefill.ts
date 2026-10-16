@@ -1,3 +1,4 @@
+import { compareGrades } from '../grades/order.js';
 import { median } from '../math.js';
 
 import type { AttemptSummary, GradeTally, TrainingLogPrefill } from './types.js';
@@ -21,7 +22,10 @@ function tallyGrades(attempts: readonly AttemptSummary[]): GradeTally[] {
     if (attempt.outcome === 'top') existing.sent += 1;
     byKey.set(key, existing);
   }
-  return [...byKey.values()].sort((a, b) => a.grade.localeCompare(b.grade));
+  return [...byKey.values()].sort(
+    (a, b) =>
+      a.discipline.localeCompare(b.discipline) || compareGrades(a.grade, b.grade, a.discipline),
+  );
 }
 
 /**
@@ -37,8 +41,7 @@ export function prefillTrainingLog(
     .filter((value): value is number => value !== null);
   const mean = rated.length === 0 ? null : rated.reduce((sum, n) => sum + n, 0) / rated.length;
   const max = rated.length === 0 ? null : Math.max(...rated);
-  const sessionExertion =
-    mean === null || max === null ? null : roundHalf(0.5 * max + 0.5 * mean);
+  const sessionExertion = mean === null || max === null ? null : roundHalf(0.5 * max + 0.5 * mean);
 
   const boulderIds = new Set(
     attempts

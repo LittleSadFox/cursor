@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { createMulberry32 } from '../eval/rng.js';
+
 import { acwr, acwrBand } from './acwr.js';
 import { ewmaLoad, rollingAverages } from './averages.js';
 import { addDays, eachDay, isoWeek } from './dates.js';
@@ -29,11 +31,7 @@ describe('dates', () => {
     // 2026-03-08 is the US spring-forward Sunday; UTC noon stays on the civil date.
     expect(addDays('2026-03-07', 1)).toBe('2026-03-08');
     expect(addDays('2026-03-08', 1)).toBe('2026-03-09');
-    expect(eachDay('2026-03-07', '2026-03-09')).toEqual([
-      '2026-03-07',
-      '2026-03-08',
-      '2026-03-09',
-    ]);
+    expect(eachDay('2026-03-07', '2026-03-09')).toEqual(['2026-03-07', '2026-03-08', '2026-03-09']);
   });
 
   it('labels ISO weeks', () => {
@@ -182,6 +180,122 @@ describe('charts', () => {
     expect(summary.totalLoad).toBe(770);
     expect(summary.hardestSend).toBe('V5');
     expect(summary.daysSinceRest).toBe(2);
+  });
+});
+
+function dailyLogs(start: string, days: number, load: (i: number) => number | null): DailyLog[] {
+  const out: DailyLog[] = [];
+  for (let i = 0; i < days; i += 1) {
+    const value = load(i);
+    if (value === null) continue;
+    out.push(log({ date: addDays(start, i), sessionExertion: 1, durationMin: value }));
+  }
+  return out;
+}
+
+function naiveRolling(logs: readonly DailyLog[], date: string) {
+  const window = (days: number) =>
+    logs
+      .filter((entry) => entry.date <= date && entry.date >= addDays(date, -(days - 1)))
+      .map(sessionLoad)
+      .filter((value): value is number => value !== null);
+  const short = window(7);
+  const long = window(28);
+  const avg = (values: number[]) =>
+    values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+  return { short: avg(short), long: avg(long), shortCount: short.length, longCount: long.length };
+}
+
+describe('trainingLoad series', () => {
+  it('matches a per-day recomputation on irregular logs', () => {
+    const rng = createMulberry32(11);
+    const logs = dailyLogs('2026-01-01', 200, () => (rng() < 0.4 ? null : Math.round(rng() * 600)));
+    const range = { from: '2026-02-15', to: '2026-07-19' };
+    const series = trainingLoad(logs, range, 'rolling');
+    for (const day of series.days) {
+      const naive = naiveRolling(logs, day.date);
+      expect(day.short).toBe(naive.short === null ? null : Math.round(naive.short * 10) / 10);
+      expect(day.long).toBe(naive.long === null ? null : Math.round(naive.long * 10) / 10);
+      const enough = naive.shortCount >= 4 && naive.longCount >= 14;
+      expect(day.band === 'insufficient_data').toBe(!enough || naive.long === 0);
+    }
+    const ewma = trainingLoad(logs, range, 'ewma');
+    for (const day of ewma.days) {
+      const reference = ewmaLoad(
+        new Map(logs.map((entry) => [entry.date, sessionLoad(entry)])),
+        day.date,
+      );
+      expect(day.short).toBe(
+        reference.short === null ? null : Math.round(reference.short * 10) / 10,
+      );
+    }
+  });
+
+  it('applies the 7/28-day sample floor to EWMA, so a long break is insufficient_data', () => {
+    const logs = dailyLogs('2026-01-01', 60, () => 300);
+    const series = trainingLoad(logs, { from: '2026-02-20', to: '2026-06-01' }, 'ewma');
+    expect(series.days[0]?.band).toBe('steady');
+    // Three months after the last entry the stale EWMA must not still report a ratio.
+    const last = series.days.at(-1);
+    expect(last?.acwr).toBeNull();
+    expect(last?.band).toBe('insufficient_data');
+  });
+
+  it('handles a ten-year range over years of logs quickly', () => {
+    const logs = dailyLogs('2017-01-01', 3650, (i) => (i % 3 === 0 ? null : 200 + (i % 7) * 10));
+    const started = Date.now();
+    const series = trainingLoad(logs, { from: '2017-01-01', to: '2026-12-31' }, 'ewma');
+    expect(series.days.length).toBeGreaterThan(3650);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe('grade ordering', () => {
+  it('sorts the pyramid by difficulty, not by string', () => {
+    const logs = [
+      log({
+        date: '2026-10-15',
+        grades: [
+          { discipline: 'boulder', grade: 'V10', attempted: 1, sent: 0 },
+          { discipline: 'boulder', grade: 'V2', attempted: 2, sent: 2 },
+          { discipline: 'boulder', grade: 'VB', attempted: 1, sent: 1 },
+          { discipline: 'boulder', grade: '6A+', attempted: 1, sent: 1 },
+        ],
+      }),
+    ];
+    const pyramid = gradePyramid(logs, { from: '2026-10-15', to: '2026-10-15' }, 'boulder');
+    expect(pyramid.map((row) => row.grade)).toEqual(['VB', 'V2', '6A+', 'V10']);
+  });
+
+  it('finds the hardest send in another boulder system and in route grades', () => {
+    const week = isoWeek('2026-10-15');
+    const boulder = weeklySummary(
+      [
+        log({
+          date: '2026-10-15',
+          grades: [
+            { discipline: 'boulder', grade: 'V9', attempted: 1, sent: 1 },
+            { discipline: 'boulder', grade: 'V10', attempted: 1, sent: 1 },
+          ],
+        }),
+      ],
+      week,
+      'font',
+    );
+    expect(boulder.hardestSend).toBe('V10');
+    const route = weeklySummary(
+      [
+        log({
+          date: '2026-10-15',
+          grades: [
+            { discipline: 'route', grade: '7a', attempted: 1, sent: 1 },
+            { discipline: 'route', grade: '6c+', attempted: 1, sent: 1 },
+          ],
+        }),
+      ],
+      week,
+    );
+    expect(route.hardestSend).toBe('7a');
   });
 });
 

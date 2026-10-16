@@ -1,25 +1,17 @@
-import { addDays, daysBetween } from './dates.js';
+import { createLoadScanner, LONG_DAYS, SHORT_DAYS, type LoggedLoad } from './load-scanner.js';
 import { isLoggedLoad } from './load.js';
 
-const SHORT_DAYS = 7;
-const LONG_DAYS = 28;
 const SHORT_MIN_LOGGED = 4;
 const LONG_MIN_LOGGED = 14;
 
 export type LoadByDate = ReadonlyMap<string, number | null>;
 
-function loggedLoadsInWindow(
-  loads: LoadByDate,
-  endDate: string,
-  windowDays: number,
-): number[] {
-  const start = addDays(endDate, -(windowDays - 1));
-  const values: number[] = [];
+export function loggedLoads(loads: LoadByDate): LoggedLoad[] {
+  const out: LoggedLoad[] = [];
   for (const [date, load] of loads) {
-    if (date < start || date > endDate) continue;
-    if (isLoggedLoad(load)) values.push(load);
+    if (isLoggedLoad(load)) out.push({ date, load });
   }
-  return values;
+  return out;
 }
 
 export function mean(values: readonly number[]): number | null {
@@ -32,17 +24,20 @@ export function rollingAverages(
   loads: LoadByDate,
   date: string,
 ): { short: number | null; long: number | null; shortCount: number; longCount: number } {
-  const shortValues = loggedLoadsInWindow(loads, date, SHORT_DAYS);
-  const longValues = loggedLoadsInWindow(loads, date, LONG_DAYS);
+  const w = createLoadScanner(loggedLoads(loads)).windowsAt(date);
   return {
-    short: mean(shortValues),
-    long: mean(longValues),
-    shortCount: shortValues.length,
-    longCount: longValues.length,
+    short: w.shortCount === 0 ? null : w.shortSum / w.shortCount,
+    long: w.longCount === 0 ? null : w.longSum / w.longCount,
+    shortCount: w.shortCount,
+    longCount: w.longCount,
   };
 }
 
-export function hasEnoughRollingSamples(shortCount: number, longCount: number): boolean {
+/**
+ * The ACWR sample floor for both methods: fewer than 4 logged days in the 7-day window or
+ * fewer than 14 in the 28-day window means `insufficient_data` (BUILD_PLAN §4.3).
+ */
+export function hasEnoughSamples(shortCount: number, longCount: number): boolean {
   return shortCount >= SHORT_MIN_LOGGED && longCount >= LONG_MIN_LOGGED;
 }
 
@@ -56,35 +51,7 @@ export function ewmaLoad(
   tauShort = SHORT_DAYS,
   tauLong = LONG_DAYS,
 ): { short: number | null; long: number | null; loggedCount: number } {
-  const entries = [...loads.entries()]
-    .filter(([day, load]) => day <= date && isLoggedLoad(load))
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) as [string, number][];
-
-  if (entries.length === 0) {
-    return { short: null, long: null, loggedCount: 0 };
-  }
-
-  const first = entries[0];
-  if (first === undefined) return { short: null, long: null, loggedCount: 0 };
-  let short = first[1];
-  let long = first[1];
-  let prevDate = first[0];
-
-  for (let i = 1; i < entries.length; i += 1) {
-    const entry = entries[i];
-    if (entry === undefined) continue;
-    const [day, value] = entry;
-    const delta = Math.max(1, daysBetween(prevDate, day));
-    const alphaShort = 1 - Math.exp(-delta / tauShort);
-    const alphaLong = 1 - Math.exp(-delta / tauLong);
-    short = alphaShort * value + (1 - alphaShort) * short;
-    long = alphaLong * value + (1 - alphaLong) * long;
-    prevDate = day;
-  }
-
-  return { short, long, loggedCount: entries.length };
-}
-
-export function hasEnoughEwmaSamples(loggedCount: number): boolean {
-  return loggedCount >= LONG_MIN_LOGGED;
+  const logged = loggedLoads(loads);
+  const state = createLoadScanner(logged, tauShort, tauLong).ewmaAt(date);
+  return { ...state, loggedCount: logged.filter((entry) => entry.date <= date).length };
 }
