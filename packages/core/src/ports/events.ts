@@ -10,10 +10,21 @@ const RING_MS = 5 * 60 * 1000;
 
 type Buffered = CoachEvent & { id: string; bufferedAt: number };
 
-/** In-memory fan-out with a 5-minute Last-Event-ID ring buffer (BUILD_PLAN §4.4). */
+function sequenceOf(id: string, epoch: string): number | null {
+  const [prefix, seq] = id.split('-');
+  if (prefix !== epoch || seq === undefined) return null;
+  const value = Number(seq);
+  return Number.isInteger(value) ? value : null;
+}
+
+/**
+ * In-memory fan-out with a 5-minute Last-Event-ID ring buffer (BUILD_PLAN §4.4). Ids carry the
+ * bus start time, so an id from before a restart replays the whole ring instead of nothing.
+ */
 export function createEventBus(nowMs: () => number): EventBus {
   const handlers = new Set<EventHandler>();
   const ring: Buffered[] = [];
+  const epoch = String(nowMs());
   let seq = 0;
 
   function prune(now: number): void {
@@ -29,7 +40,7 @@ export function createEventBus(nowMs: () => number): EventBus {
       const now = nowMs();
       prune(now);
       seq += 1;
-      const buffered: Buffered = { ...event, id: String(seq), bufferedAt: now };
+      const buffered: Buffered = { ...event, id: `${epoch}-${seq}`, bufferedAt: now };
       ring.push(buffered);
       for (const handler of handlers) handler(buffered);
     },
@@ -42,9 +53,9 @@ export function createEventBus(nowMs: () => number): EventBus {
     resumeFrom(lastEventId) {
       const now = nowMs();
       prune(now);
-      const last = Number(lastEventId);
-      if (!Number.isFinite(last)) return [...ring];
-      return ring.filter((event) => Number(event.id) > last);
+      const last = sequenceOf(lastEventId, epoch);
+      if (last === null) return [...ring];
+      return ring.filter((event) => (sequenceOf(event.id, epoch) ?? 0) > last);
     },
   };
 }
