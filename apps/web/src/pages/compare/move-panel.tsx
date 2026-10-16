@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 
 import type { AlignmentVerdict } from '@climbing-coach/api';
 
@@ -48,8 +48,11 @@ export type MovePanelProps = {
   onSeek: (position: number) => void;
 };
 
-/** Per-move observations, current move first-class, with alignment feedback (PLAN 2.7–2.8). */
-export function MoveDifferencePanel(props: MovePanelProps) {
+/**
+ * Per-move observations, current move first-class, with alignment feedback (PLAN 2.7–2.8).
+ * Memoized: the player re-renders every animation frame, the panel only when the move changes.
+ */
+export const MoveDifferencePanel = memo(function MoveDifferencePanel(props: MovePanelProps) {
   const { i18n } = useLingui();
   if (props.spans.length === 0) return <p>{i18n._('compare.noMoves')}</p>;
   return (
@@ -88,4 +91,4 @@ export function MoveDifferencePanel(props: MovePanelProps) {
       ))}
     </ol>
   );
-}
+});
