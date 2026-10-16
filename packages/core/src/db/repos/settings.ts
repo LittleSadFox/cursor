@@ -6,11 +6,13 @@ import type { Clock } from '../../ports/clock.js';
 import type { AppDatabase } from '../../ports/sql.js';
 import { parseJson, stringifyJson } from '../json.js';
 import { settings } from '../schema.js';
+import { inTransaction } from '../tx.js';
 import { assertVersion, nextVersion } from '../version.js';
 
 const SETTINGS_KEY = 'app';
 
-type Stored = Omit<Settings, 'libraryReady'>;
+export type StoredSettings = Omit<Settings, 'libraryReady'>;
+type Stored = StoredSettings;
 
 function asStored(value: unknown): Stored {
   const rec = value as Partial<Stored>;
@@ -37,6 +39,10 @@ export function readSettings(db: AppDatabase): Stored {
 }
 
 export function writeSettings(db: AppDatabase, clock: Clock, patch: SettingsPatch): Stored {
+  return inTransaction(db, (tx) => writeSettingsIn(tx, clock, patch));
+}
+
+function writeSettingsIn(db: AppDatabase, clock: Clock, patch: SettingsPatch): Stored {
   const current = readSettings(db);
   assertVersion(current.version, patch.expectedVersion, 'settings');
   const next: Stored = {

@@ -50,7 +50,9 @@ export type BoulderPatch = z.infer<typeof BoulderPatchSchema>;
 
 export const BoulderListQuerySchema = CursorQuerySchema.extend({
   gymId: UlidSchema.optional(),
-  active: z.coerce.boolean().optional(),
+  active: z
+    .union([z.boolean(), z.enum(['true', 'false']).transform((value) => value === 'true')])
+    .optional(),
   gradeMin: z.string().min(1).optional(),
   gradeMax: z.string().min(1).optional(),
   q: z.string().min(1).optional(),

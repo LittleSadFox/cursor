@@ -81,9 +81,16 @@ export const TrainingLogInputSchema = z.object({
   sessionType: SessionTypeSchema.default('climbing'),
   primaryFocusId: z.string().min(1).nullable().optional(),
   secondaryFocusIds: z.array(z.string().min(1)).default([]),
-  grades: z.array(GradeBreakdownSchema).default([]),
+  grades: z
+    .array(GradeBreakdownSchema)
+    .default([])
+    .refine(
+      (rows) => new Set(rows.map((row) => `${row.discipline}:${row.grade}`)).size === rows.length,
+      'each discipline + grade may appear once',
+    ),
   body: TrainingLogBodySchema.nullable().optional(),
   notes: z.string().default(''),
+  expectedVersion: z.number().int().positive().optional(),
 });
 export type TrainingLogInput = z.infer<typeof TrainingLogInputSchema>;
 

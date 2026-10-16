@@ -21,7 +21,21 @@ export function probeFfmpegStatus(): FfmpegStatus {
   };
 }
 
-export { openSqliteLibrary, sqliteExecutor, type OpenedLibrary } from './sqlite.js';
+export {
+  openSqliteLibrary,
+  sqliteExecutor,
+  type OpenedLibrary,
+  type OpenLibraryOptions,
+} from './sqlite.js';
+export { backupFileName, pruneBackups, KEEP_BACKUPS } from './backups.js';
 export { signMedia, verifyMedia } from './signed-url.js';
-export { defaultLibraryRoot, resolveUnderRoot, libraryDbPath, backupsDir } from './paths.js';
+export {
+  appConfigDir,
+  backupsDir,
+  defaultLibraryRoot,
+  libraryDbPath,
+  readLibraryPointer,
+  resolveUnderRoot,
+  writeLibraryPointer,
+} from './paths.js';
 export { nodeRandomBytes } from './random.js';

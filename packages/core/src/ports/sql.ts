@@ -17,5 +17,6 @@ export type SqlExecutor = {
 };
 
 export type SqliteBackup = {
-  backupTo(destPath: string): Promise<void>;
+  /** Writes a consistent copy into the library's `backups/` folder and prunes old copies. */
+  backup(label: string): Promise<{ path: string }>;
 };

@@ -13,6 +13,7 @@ export const PROBLEM_CODES = {
   UNSUPPORTED_MEDIA: 415,
   POSE_RUNTIME_UNAVAILABLE: 503,
   FFMPEG_UNAVAILABLE: 503,
+  INTERNAL: 500,
   NOT_IMPLEMENTED: 501,
   STORAGE_FULL: 507,
 } as const;
@@ -45,6 +46,7 @@ const TITLES: Record<ProblemCode, string> = {
   UNSUPPORTED_MEDIA: 'Unsupported media',
   POSE_RUNTIME_UNAVAILABLE: 'Pose runtime unavailable',
   FFMPEG_UNAVAILABLE: 'ffmpeg unavailable',
+  INTERNAL: 'Internal error',
   NOT_IMPLEMENTED: 'Not implemented',
   STORAGE_FULL: 'Storage full',
 };
@@ -69,5 +71,7 @@ export class ProblemError extends Error {
 export function isProblem(value: unknown): value is Problem {
   if (typeof value !== 'object' || value === null) return false;
   const rec = value as Record<string, unknown>;
-  return typeof rec.code === 'string' && typeof rec.status === 'number' && typeof rec.detail === 'string';
+  return (
+    typeof rec.code === 'string' && typeof rec.status === 'number' && typeof rec.detail === 'string'
+  );
 }

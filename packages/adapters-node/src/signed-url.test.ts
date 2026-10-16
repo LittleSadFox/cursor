@@ -16,5 +16,17 @@ describe('path traversal guard', () => {
     expect(resolveUnderRoot('/lib', 'clips/a.mp4')).toBe('/lib/clips/a.mp4');
     expect(resolveUnderRoot('/lib', '../etc/passwd')).toBeNull();
     expect(resolveUnderRoot('/lib', 'clips/../../etc/passwd')).toBeNull();
+    expect(resolveUnderRoot('/lib', '..')).toBeNull();
+    expect(resolveUnderRoot('/lib', '/etc/passwd')).toBeNull();
+  });
+
+  it('rejects the root itself and sibling directories that share its prefix', () => {
+    expect(resolveUnderRoot('/lib', '')).toBeNull();
+    expect(resolveUnderRoot('/lib', '.')).toBeNull();
+    expect(resolveUnderRoot('/lib', '../lib-other/a.mp4')).toBeNull();
+  });
+
+  it('allows names that merely start with two dots', () => {
+    expect(resolveUnderRoot('/lib', '..clip.mp4')).toBe('/lib/..clip.mp4');
   });
 });
