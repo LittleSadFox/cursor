@@ -80,3 +80,64 @@ jobs:
 
       - name: Build + test schema
         run: pnpm --filter @climbing-coach/schema build && pnpm --filter @climbing-coach/schema test
+
+  macos-ffmpeg:
+    name: LGPL ffmpeg (macOS arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache ffmpeg prefix and source tarballs
+        uses: actions/cache@v4
+        with:
+          path: |
+            vendor/ffmpeg/.cache
+            vendor/ffmpeg/darwin-arm64
+          key: ffmpeg-darwin-arm64-${{ hashFiles('scripts/ffmpeg/versions.env', 'scripts/ffmpeg/configure-lgpl.sh', 'scripts/ffmpeg/build-macos-arm64.sh') }}
+
+      - name: Build LGPL ffmpeg + ffprobe
+        run: bash scripts/ffmpeg/build-macos-arm64.sh
+
+      - name: Download public decode samples
+        run: bash scripts/ffmpeg/download-samples.sh
+
+      - name: Verify codecs and filters
+        run: bash scripts/ffmpeg/verify.sh
+
+      - name: Sign dummy app if Apple secrets exist
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: bash scripts/ffmpeg/sign-dummy-app.sh
+
+      - name: Locator finds the CI prefix
+        run: pnpm --filter @climbing-coach/adapters-node test
+
+      - name: Upload ffmpeg artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-darwin-arm64
+          path: |
+            vendor/ffmpeg/darwin-arm64/bin
+            vendor/ffmpeg/darwin-arm64/BUILD.json
+            vendor/ffmpeg/darwin-arm64/COPYING.LGPLv2.1
+            vendor/ffmpeg/darwin-arm64/VERIFY.md
+            vendor/ffmpeg/darwin-arm64/SIGNING.md
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,16 @@
+.cache/
+darwin-arm64/bin/
+darwin-arm64/lib/
+darwin-arm64/include/
+darwin-arm64/share/
+darwin-arm64/BUILD.json
+darwin-arm64/VERIFY.md
+darwin-arm64/SIGNING.md
+darwin-arm64/verify-scratch/
+darwin-arm64/*.app/
+darwin-arm64/*.zip
+darwin-arm64/*.p12
+darwin-arm64/*.p8
+darwin-arm64/*.keychain-db
+*.tar.xz
+*.tar.gz

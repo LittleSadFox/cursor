@@ -40,6 +40,8 @@ packages/core     Use cases, DB, jobs (no HTTP/Electron/React)
 packages/config   Shared tsconfig / ESLint / Vitest presets
 packages/test-fixtures  Synthetic climber and activity frames (no engine import)
 research/pose-lab Python bake-off + posebin round-trip (not a pnpm package)
+scripts/ffmpeg    LGPL macOS arm64 ffmpeg/ffprobe build + verify (P0.8 / ADR-002)
+vendor/ffmpeg     CI prefix (`darwin-arm64/bin`); binaries are gitignored
 ```
 
 Dependency direction (enforced by `pnpm deps:check`):  
@@ -59,18 +61,18 @@ pnpm build
 
 ## Commands
 
-| Task              | Command                                                           |
-| ----------------- | ----------------------------------------------------------------- |
-| Build all         | `pnpm build`                                                      |
-| Lint              | `pnpm lint`                                                       |
-| Typecheck         | `pnpm typecheck`                                                  |
-| Unit tests        | `pnpm test`                                                       |
-| Module boundaries | `pnpm deps:check`                                                 |
-| Full local check  | `pnpm verify`                                                     |
-| Web UI            | `pnpm --filter @climbing-coach/web dev` |
+| Task              | Command                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| Build all         | `pnpm build`                                                                              |
+| Lint              | `pnpm lint`                                                                               |
+| Typecheck         | `pnpm typecheck`                                                                          |
+| Unit tests        | `pnpm test`                                                                               |
+| Module boundaries | `pnpm deps:check`                                                                         |
+| Full local check  | `pnpm verify`                                                                             |
+| Web UI            | `pnpm --filter @climbing-coach/web dev`                                                   |
 | API server        | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` (dev token `dev-token`) |
-| Schema only       | `pnpm --filter @climbing-coach/schema test`                       |
-| Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                    |
+| Schema only       | `pnpm --filter @climbing-coach/schema test`                                               |
+| Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                                            |
 
 CI: `.github/workflows/ci.yml` (Linux lint/typecheck/test/deps + Python posebin; macOS arm64
 schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
@@ -99,14 +101,15 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 **In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), and
 Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell + homepage
 training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades` are
-pure. Health is `degraded` until ffmpeg and the pose runtime ship. Phase 3 (P3.1–P3.5):
+pure. Health is `degraded` until the pose runtime ships; the P0.8 locator reports
+bundled/env ffmpeg only (Linux PATH is a non-shipping fallback). Phase 3 (P3.1–P3.5):
 `engine/compare` posture deltas + per-move text, `compare` job pipeline with a cached
 `comparisons` table (migration 0002), `/comparisons` + `/videos/:id/pose` routes, and the web
 `/compare` view (playback controller, skeleton/ghost renderer, divergence timeline, move panel,
 alignment feedback labels).
 
 **Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off / adapter
-(P0.5–P0.6, P1.8), shipped ffmpeg and video tools (P0.8, P1.7), ingest/review (P2-B),
+(P0.5–P0.6, P1.8), P1.7 video tools (P0.8 locator is in tree; ADR-002 still Proposed), ingest/review (P2-B),
 library/player/rating (P2-C), Electron packaging (P2-D), comparison video playback and
 export (P3.6, ADR-002), wall-relative ghost alignment, mobile. Implement those only when the
 matching phase item says so and prerequisites exist.

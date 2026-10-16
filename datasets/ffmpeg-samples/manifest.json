@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Public decode samples for P0.8 ffmpeg verify. Not the climbing dataset.",
+  "samples": [
+    {
+      "id": "h264-bbb",
+      "file": "media/h264-bbb.mp4",
+      "codec": "h264",
+      "container": "mp4",
+      "notes": "Big Buck Bunny 10s 360p H.264 excerpt",
+      "license": "CC-BY 3.0 (Blender Foundation / www.bigbuckbunny.org)",
+      "source": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+      "sha256": "77145c94c11f3754207499158df22406e1fe7635553c1c86dc5e881dfeb32016"
+    },
+    {
+      "id": "hevc-bbb",
+      "file": "media/hevc-bbb.mp4",
+      "codec": "hevc",
+      "container": "mp4",
+      "notes": "Big Buck Bunny 10s 360p HEVC excerpt (SDR, not iPhone HEVC/HDR)",
+      "license": "CC-BY 3.0 (Blender Foundation / www.bigbuckbunny.org)",
+      "source": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h265/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+      "sha256": "1002dc56cbc487595252b86a088cbf6ba03eb434c33c27a31ca46254310fb05b"
+    },
+    {
+      "id": "dovi-p5",
+      "file": "media/dovi-p5.mp4",
+      "codec": "hevc",
+      "dolbyVision": "profile-5",
+      "notes": "FFmpeg FATE Dolby Vision Profile 5 test vector. Not an iPhone clip.",
+      "license": "FFmpeg FATE test vector (codec conformance)",
+      "source": "https://fate-suite.ffmpeg.org/mov/dovi-p5.mp4",
+      "sha256": "11fe599fd77e31e26fbf855bae1cd9931df9f261a0a7b1dce9fad9b236677c4b"
+    },
+    {
+      "id": "dovi-p81",
+      "file": "media/dovi-p81.mp4",
+      "codec": "hevc",
+      "dolbyVision": "profile-8.1",
+      "notes": "FFmpeg FATE Dolby Vision Profile 8.1. Closer to iPhone DV (often 8.4) than P5, still not a phone recording.",
+      "license": "FFmpeg FATE test vector (codec conformance)",
+      "source": "https://fate-suite.ffmpeg.org/mov/dovi-p81.mp4",
+      "sha256": "3313278f3dc49b0b3680ec7c3d72622ec0a770faff9721c5842aaf899d5471c5"
+    }
+  ],
+  "deferred": [
+    {
+      "id": "iphone-hevc-hdr",
+      "hook": "iphone/",
+      "reason": "Need a user-supplied iPhone HEVC/HDR .mov. Public samples are not phone recordings."
+    },
+    {
+      "id": "iphone-dolby-vision",
+      "hook": "iphone/",
+      "reason": "Need a user-supplied iPhone Dolby Vision clip. FATE P5/P8.1 only prove the decoder, not iPhone packing."
+    }
+  ]
+}

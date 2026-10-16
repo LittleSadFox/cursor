@@ -9,6 +9,7 @@ import {
   libraryDbPath,
   nodeRandomBytes,
   openSqliteLibrary,
+  probeFfmpegStatus,
   readLibraryPointer,
   writeLibraryPointer,
 } from '@climbing-coach/adapters-node';
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
 
   let persistLibraryRoot = false;
   const events = createEventBus(() => clock.nowMs());
+  const ffmpeg = probeFfmpegStatus();
   const api = createCoreApi({
     db: opened.db,
     sql: opened.sql,
@@ -56,7 +58,9 @@ async function main(): Promise<void> {
     logger: consoleLogger,
     backup: opened.backup,
     blobs: libraryBlobs(libraryRoot),
-    ffmpegAvailable: false,
+    ffmpegAvailable: ffmpeg.available,
+    ffmpegVersion: ffmpeg.version,
+    ffmpegNote: ffmpeg.note,
     poseAvailable: false,
     onLibraryRootChange: (root) => {
       if (persistLibraryRoot) writeLibraryPointer(configDir, root);

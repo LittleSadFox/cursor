@@ -1,0 +1,3 @@
+media/
+iphone/*
+!iphone/README.md

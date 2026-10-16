@@ -10,6 +10,8 @@ export type SystemDeps = {
   db: AppDatabase;
   clock: Clock;
   ffmpegAvailable: boolean;
+  ffmpegVersion?: string | null;
+  ffmpegNote?: string;
   poseAvailable: boolean;
   /** Persists the library location outside the library itself; takes effect on next launch. */
   onLibraryRootChange?: ((root: string | null) => void) | undefined;
@@ -31,12 +33,14 @@ export function createSystemService(deps: SystemDeps): CoachApi['system'] {
         status: deps.ffmpegAvailable && deps.poseAvailable ? 'ok' : 'degraded',
         ffmpeg: {
           available: deps.ffmpegAvailable,
-          version: null,
-          note: healthNote(
-            deps.ffmpegAvailable,
-            'ffmpeg ready',
-            'Shipped ffmpeg arrives in P0.8 (ADR-002); not bundled yet.',
-          ),
+          version: deps.ffmpegVersion ?? null,
+          note:
+            deps.ffmpegNote ??
+            healthNote(
+              deps.ffmpegAvailable,
+              'ffmpeg ready',
+              'Shipped LGPL ffmpeg is not on this machine (P0.8 locator / ADR-002).',
+            ),
         },
         pose: {
           available: deps.poseAvailable,
