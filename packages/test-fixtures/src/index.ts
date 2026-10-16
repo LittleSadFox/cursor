@@ -36,4 +36,4 @@ export {
   type ExpectedAttempt,
 } from './scenarios.js';
 
-export { movingBlob, panningFrames, staticFrames, type GrayFrame } from './gray.js';
+export { movingBlob, panningFrames, staticFrames, wallPan, type GrayFrame } from './gray.js';

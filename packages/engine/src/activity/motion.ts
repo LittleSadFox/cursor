@@ -14,8 +14,39 @@ function wrapShift(peak: number, size: number): number {
   return peak > size / 2 ? peak - size : peak;
 }
 
+function hann(length: number): Float64Array {
+  if (length <= 1) return new Float64Array(length).fill(1);
+  return Float64Array.from(
+    { length },
+    (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (length - 1)),
+  );
+}
+
 /**
- * Integer translation of `next` relative to `previous` via phase correlation.
+ * Copy into the padded buffer with the mean removed and a Hann window applied, so the
+ * frame border and the zero padding do not form a static edge that pins the peak at 0.
+ */
+function windowInto(
+  out: Float64Array,
+  pixels: ArrayLike<number>,
+  width: number,
+  height: number,
+  paddedW: number,
+): void {
+  let mean = 0;
+  for (let i = 0; i < width * height; i += 1) mean += pixels[i] ?? 0;
+  mean /= width * height;
+  const wx = hann(width);
+  const wy = hann(height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      out[y * paddedW + x] = ((pixels[y * width + x] ?? 0) - mean) * (wx[x] ?? 0) * (wy[y] ?? 0);
+    }
+  }
+}
+
+/**
+ * Integer translation of `next` relative to `previous` via windowed phase correlation.
  * Width and height may be any positive size; the FFT is zero-padded to a power of two.
  */
 export function globalMotion(
@@ -34,14 +65,8 @@ export function globalMotion(
   const im1 = new Float64Array(size);
   const re2 = new Float64Array(size);
   const im2 = new Float64Array(size);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const src = y * width + x;
-      const dst = y * paddedW + x;
-      re1[dst] = previous[src] ?? 0;
-      re2[dst] = next[src] ?? 0;
-    }
-  }
+  windowInto(re1, previous, width, height, paddedW);
+  windowInto(re2, next, width, height, paddedW);
   fft2(re1, im1, paddedW, paddedH, false);
   fft2(re2, im2, paddedW, paddedH, false);
   for (let i = 0; i < size; i += 1) {

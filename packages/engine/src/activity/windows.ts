@@ -33,28 +33,33 @@ export function activeWindows(
     startUs: clamp(run.startUs - params.padUs, 0, durationUs),
     endUs: clamp(run.endUs + params.padUs, 0, durationUs),
   }));
-  return mergeRuns(
-    padded.map((window) => ({ tUs: window.startUs, endUs: window.endUs })),
-    0,
-  ).map((run) => ({
-    startUs: run.startUs,
-    endUs: run.endUs,
-  }));
+  return unionWindows(padded);
 }
 
-type Run = { startUs: number; endUs: number };
-
-function mergeRuns(samples: readonly { tUs: number; endUs?: number }[], maxGapUs: number): Run[] {
-  const runs: Run[] = [];
+/** Active sample times grouped into runs; a gap of `maxGapUs` or more starts a new run. */
+function mergeRuns(samples: readonly Sample[], maxGapUs: number): ActivityWindow[] {
+  const runs: ActivityWindow[] = [];
   for (const sample of samples) {
-    const startUs = sample.tUs;
-    const endUs = sample.endUs ?? sample.tUs;
     const previous = runs[runs.length - 1];
-    if (!previous || startUs - previous.endUs >= maxGapUs) {
-      runs.push({ startUs, endUs });
+    if (!previous || sample.tUs - previous.endUs >= maxGapUs) {
+      runs.push({ startUs: sample.tUs, endUs: sample.tUs });
       continue;
     }
-    previous.endUs = Math.max(previous.endUs, endUs);
+    previous.endUs = Math.max(previous.endUs, sample.tUs);
   }
   return runs;
+}
+
+/** Union of start-sorted windows. Overlapping and touching windows merge. */
+function unionWindows(windows: readonly ActivityWindow[]): ActivityWindow[] {
+  const out: ActivityWindow[] = [];
+  for (const window of windows) {
+    const previous = out[out.length - 1];
+    if (previous && window.startUs <= previous.endUs) {
+      previous.endUs = Math.max(previous.endUs, window.endUs);
+    } else {
+      out.push({ ...window });
+    }
+  }
+  return out;
 }

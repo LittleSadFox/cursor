@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { movingBlob, panningFrames, staticFrames } from '@climbing-coach/test-fixtures';
+import { movingBlob, panningFrames, staticFrames, wallPan } from '@climbing-coach/test-fixtures';
 
 import { STARTING_PARAMS } from '../params.js';
 import { activityEnergy, activitySeries } from './energy.js';
@@ -93,6 +93,32 @@ describe('activity', () => {
       local.push(globalMotion(prev.pixels, next.pixels, prev.width, prev.height));
     }
     expect(cameraMovingWarning(local, STARTING_PARAMS.activity)).toBe(false);
+  });
+
+  it('recovers a pan on a 160×90 wall with a clear correlation peak', () => {
+    for (const [dx, dy] of [
+      [3, 1],
+      [-4, 2],
+      [6, -3],
+    ] as const) {
+      const [previous, next] = wallPan(2, dtUs, dx, dy);
+      if (!previous || !next) throw new Error('expected frames');
+      const shift = globalMotion(previous.pixels, next.pixels, previous.width, previous.height);
+      expect({ dx: shift.dx, dy: shift.dy }).toEqual({ dx, dy });
+      expect(shift.peak).toBeGreaterThan(0.9);
+    }
+  });
+
+  it('merges padded windows that only touch', () => {
+    const samples = [
+      { tUs: 0, energy: 1 },
+      { tUs: 6_000_000, energy: 1 },
+    ];
+    const windows = activeWindows(samples, 100_000_000, {
+      ...STARTING_PARAMS.activity,
+      energyThreshold: 0.5,
+    });
+    expect(windows).toEqual([{ startUs: 0, endUs: 9_000_000 }]);
   });
 
   it('phase correlation reports a rightward shift', () => {
