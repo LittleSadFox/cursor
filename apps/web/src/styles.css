@@ -204,3 +204,170 @@ button.ghost {
   border: 1px solid #3a5a4f;
   font-weight: 500;
 }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.compare-page,
+.compare {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.compare-picker {
+  max-width: 32rem;
+}
+
+.compare-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  align-items: center;
+  margin: 0;
+}
+
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pose-canvas {
+  background: #0b1411;
+  border: 1px solid #2a4a3f;
+  border-radius: 12px;
+  max-width: 100%;
+}
+
+.legend {
+  color: var(--muted);
+  margin: 0;
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-left: 0.6rem;
+}
+
+.swatch.a {
+  background: #e8f0ec;
+}
+
+.swatch.b {
+  background: #7fd3ff;
+}
+
+.swatch.highlight {
+  background: #ff8a5c;
+}
+
+.transport {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.transport input[type='range'] {
+  flex: 1;
+  padding: 0;
+}
+
+.transport-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.divergence {
+  margin: 0;
+}
+
+.divergence figcaption {
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.divergence svg {
+  width: 100%;
+  height: 90px;
+  cursor: pointer;
+  background: #0b1411;
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+}
+
+.move-band {
+  fill: #1f3a31;
+}
+
+.move-band:nth-of-type(even) {
+  fill: #19302a;
+}
+
+.move-band.unmatched {
+  fill: #3a2f1f;
+}
+
+.divergence-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.divergence-cursor {
+  stroke: #ff8a5c;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.move-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.move {
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.move.current {
+  border-color: var(--accent);
+}
+
+.move header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.move ul {
+  margin: 0.5rem 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--muted);
+}

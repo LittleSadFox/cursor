@@ -1,6 +1,8 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 
 import { api } from './api.js';
+import { ComparePage } from './pages/compare/compare.js';
+import { compareSearch } from './pages/compare/search.js';
 import { HomePage } from './pages/home.js';
 import { PlaceholderPage } from './pages/placeholder.js';
 import { SettingsPage } from './pages/settings.js';
@@ -52,6 +54,15 @@ const recordingsRoute = createRoute({
   component: () => <PlaceholderPage messageId="placeholder.recordings" />,
 });
 
+const compareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/compare',
+  validateSearch: compareSearch,
+  component: function CompareRoute() {
+    return <ComparePage {...compareRoute.useSearch()} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   setupRoute,
@@ -59,6 +70,7 @@ const routeTree = rootRoute.addChildren([
   trashRoute,
   libraryRoute,
   recordingsRoute,
+  compareRoute,
 ]);
 
 export const router = createRouter({ routeTree });

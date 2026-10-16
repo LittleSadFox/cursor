@@ -5,6 +5,7 @@ const NAV = [
   { to: '/', label: 'nav.home' },
   { to: '/library', label: 'nav.library' },
   { to: '/recordings', label: 'nav.recordings' },
+  { to: '/compare', label: 'nav.compare' },
   { to: '/trash', label: 'nav.trash' },
   { to: '/settings', label: 'nav.settings' },
 ] as const;
