@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { readComparisonBin, writeComparisonBin } from './comparison-bin.js';
+import {
+  MAX_WARP_US,
+  readComparisonBin,
+  warpTimeUs,
+  writeComparisonBin,
+} from './comparison-bin.js';
 
 describe('comparison bin', () => {
   it('round-trips warp times and divergence rows, including NaN', () => {
@@ -52,5 +57,13 @@ describe('comparison bin', () => {
     const bad = bytes.slice();
     bad[0] = 0;
     expect(() => readComparisonBin(bad)).toThrow(/not a comparison bin/);
+  });
+
+  it('accepts warp times only inside the Int32 range', () => {
+    expect(warpTimeUs(0)).toBe(0);
+    expect(warpTimeUs(MAX_WARP_US)).toBe(MAX_WARP_US);
+    for (const bad of [-1, MAX_WARP_US + 1, 1.5, Number.NaN]) {
+      expect(() => warpTimeUs(bad)).toThrow(/warp time/);
+    }
   });
 });

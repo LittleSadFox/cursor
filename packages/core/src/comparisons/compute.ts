@@ -14,7 +14,7 @@ import {
   type PoseSample,
   type StationaryPeriod,
 } from '@climbing-coach/engine';
-import { readPosebin, type ComparisonBin } from '@climbing-coach/schema';
+import { readPosebin, warpTimeUs, type ComparisonBin } from '@climbing-coach/schema';
 
 import type { ComparisonResultJson } from '../db/repos/comparisons.js';
 
@@ -63,14 +63,20 @@ function finiteOrNull(value: number | undefined): number | null {
 }
 
 /** Index warp → clip-time warp; deltas plus score per row. */
-export function resultBin(a: LoadedSide, b: LoadedSide, result: ComparisonResult): ComparisonBin {
+export function resultBin(
+  a: Pick<LoadedSide, 'samples'>,
+  b: Pick<LoadedSide, 'samples'>,
+  result: Pick<ComparisonResult, 'warp' | 'deltas' | 'score'>,
+): ComparisonBin {
   const steps = result.score.length;
   const warpUs = new Int32Array(steps * 2);
   const width = CHANNEL_COUNT + 1;
   const divergence = new Float32Array(steps * width);
   for (let step = 0; step < steps; step += 1) {
-    warpUs[step * 2] = a.samples[result.warp[step * 2] ?? -1]?.tUs ?? -1;
-    warpUs[step * 2 + 1] = b.samples[result.warp[step * 2 + 1] ?? -1]?.tUs ?? -1;
+    warpUs[step * 2] = warpTimeUs(a.samples[result.warp[step * 2] ?? -1]?.tUs ?? Number.NaN);
+    warpUs[step * 2 + 1] = warpTimeUs(
+      b.samples[result.warp[step * 2 + 1] ?? -1]?.tUs ?? Number.NaN,
+    );
     divergence.set(
       result.deltas.subarray(step * CHANNEL_COUNT, (step + 1) * CHANNEL_COUNT),
       step * width,

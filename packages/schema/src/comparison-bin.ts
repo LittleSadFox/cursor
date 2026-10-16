@@ -68,3 +68,14 @@ export function readComparisonBin(bytes: Uint8Array): ComparisonBin {
 }
 
 export const COMPARISON_BIN_FORMAT_VERSION = FORMAT_VERSION;
+
+/** Int32 µs reach about 35.8 minutes of clip time. */
+export const MAX_WARP_US = 2 ** 31 - 1;
+
+/** A clip time that fits the Int32 warp column; anything else would wrap silently. */
+export function warpTimeUs(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > MAX_WARP_US) {
+    throw new Error(`warp time ${value} µs is not an integer in [0, ${MAX_WARP_US}]`);
+  }
+  return value;
+}

@@ -40,6 +40,8 @@ export {
   writeComparisonBin,
   readComparisonBin,
   COMPARISON_BIN_FORMAT_VERSION,
+  MAX_WARP_US,
+  warpTimeUs,
   type ComparisonBin,
 } from './comparison-bin.js';
 
