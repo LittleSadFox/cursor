@@ -3,18 +3,22 @@ import type { CoachApi } from '@climbing-coach/api';
 import { seedFocusTags } from './db/repos/focus-tags.js';
 import { readSettings } from './db/repos/settings.js';
 import type { IdGen } from './ids/ulid.js';
+import { compareHandlers } from './jobs/compare-handlers.js';
 import { maintenanceHandlers } from './jobs/handlers.js';
-import { P2A_PIPELINES } from './jobs/pipelines.js';
+import { CORE_PIPELINES } from './jobs/pipelines.js';
 import { createJobRunner, type JobRunner } from './jobs/runner.js';
+import type { BlobStore } from './ports/blobs.js';
 import type { Clock } from './ports/clock.js';
 import type { EventBus } from './ports/events.js';
 import type { Logger } from './ports/logger.js';
 import type { AppDatabase, SqlExecutor, SqliteBackup } from './ports/sql.js';
 import { createCatalogService } from './services/catalog.js';
+import { createComparisonService } from './services/comparisons.js';
 import { createStatsService } from './services/stats.js';
 import { createSystemService } from './services/system.js';
 import { createTrainingService } from './services/training.js';
 import { createTrashService } from './services/trash.js';
+import { createVideoService } from './services/videos.js';
 
 export type CoreDeps = {
   db: AppDatabase;
@@ -24,6 +28,8 @@ export type CoreDeps = {
   events: EventBus;
   logger: Logger;
   backup?: SqliteBackup;
+  /** Library files (pose tracks, comparison results). Absent → those endpoints are NOT_FOUND. */
+  blobs?: BlobStore;
   ffmpegAvailable?: boolean;
   poseAvailable?: boolean;
   cpuCores?: number;
@@ -41,8 +47,11 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
     clock,
     ids: deps.ids,
     events: deps.events,
-    pipelines: P2A_PIPELINES,
-    handlers: maintenanceHandlers({ backup: deps.backup, trash }),
+    pipelines: CORE_PIPELINES,
+    handlers: {
+      ...maintenanceHandlers({ backup: deps.backup, trash }),
+      ...compareHandlers({ db, clock, events: deps.events, blobs: deps.blobs }),
+    },
     cpuCores: deps.cpuCores,
   });
   const recovered = jobsRunner.recover();
@@ -60,6 +69,15 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
     ...createTrainingService(db, clock),
     stats: createStatsService(db),
     trash,
+    videos: createVideoService({ db, blobs: deps.blobs }),
+    comparisons: createComparisonService({
+      db,
+      clock,
+      ids: deps.ids,
+      runner: jobsRunner,
+      blobs: deps.blobs,
+      ffmpegAvailable: deps.ffmpegAvailable === true,
+    }),
     jobs: {
       list: async (q) => jobsRunner.list(q),
       get: async (id) => jobsRunner.get(id),

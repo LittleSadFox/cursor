@@ -18,7 +18,8 @@ export function openMemoryLibrary(nowIso: string): MemoryLibrary {
     exec: (text) => {
       sqlite.exec(text);
     },
-    get: (text, params = []) => sqlite.prepare(text).get(...params) as Record<string, unknown> | undefined,
+    get: (text, params = []) =>
+      sqlite.prepare(text).get(...params) as Record<string, unknown> | undefined,
     run: (text, params = []) => {
       sqlite.prepare(text).run(...(params as SqlValue[]));
     },

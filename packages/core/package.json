@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@climbing-coach/config": "workspace:*",
+    "@climbing-coach/test-fixtures": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.4.1"
   }

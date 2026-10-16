@@ -92,6 +92,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
       tsx:
         specifier: ^4.19.3
         version: 4.23.15
@@ -197,6 +200,9 @@ importers:
       '@climbing-coach/config':
         specifier: workspace:*
         version: link:../config
+      '@climbing-coach/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13

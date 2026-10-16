@@ -1,4 +1,13 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 const timestamps = {
   createdAt: text('created_at').notNull(),
@@ -241,8 +250,18 @@ export const comparisons = sqliteTable(
     summaryJson: text('summary_json').notNull().default('{}'),
     version: integer('version').notNull().default(1),
     ...timestamps,
+    status: text('status').notNull().default('pending'),
+    jobId: text('job_id'),
+    error: text('error'),
+    optionsJson: text('options_json').notNull().default('{}'),
+    sidesJson: text('sides_json').notNull().default('{}'),
   },
-  (t) => [index('comparisons_deleted_at').on(t.deletedAt)],
+  (t) => [
+    index('comparisons_deleted_at').on(t.deletedAt),
+    uniqueIndex('comparisons_cache_key')
+      .on(t.attemptAId, t.attemptBId, t.poseModel, t.engineVersion, t.optionsHash)
+      .where(sql`deleted_at IS NULL`),
+  ],
 );
 
 export const trainingLogs = sqliteTable(
@@ -312,7 +331,10 @@ export const labels = sqliteTable(
     sourceVersion: text('source_version').notNull(),
     ...timestamps,
   },
-  (t) => [index('labels_kind_created').on(t.kind, t.createdAt)],
+  (t) => [
+    index('labels_kind_created').on(t.kind, t.createdAt),
+    index('labels_subject_id').on(t.subjectId),
+  ],
 );
 
 export const insights = sqliteTable(
