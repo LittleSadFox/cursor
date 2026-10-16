@@ -172,11 +172,16 @@ fi
 
 if encode_vt hevc-videotoolbox -c:v hevc_videotoolbox -allow_sw 1 \
   -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc; then
-  record "hevc_videotoolbox allow_sw=1 with synthetic HDR10 tags (not an iPhone HEVC/HDR clip)"
-  "$FFMPEG_BIN" -hide_banner -y -i "$WORKDIR/hevc-videotoolbox.mp4" -an -frames:v 4 \
-    -vf 'zscale=t=linear:npl=100,tonemap=tonemap=hable,zscale=t=bt709,format=yuv420p' \
-    -f framemd5 "$WORKDIR/synthetic-hdr-tonemap.framemd5"
-  record "tonemap on synthetic HDR-tagged HEVC"
+  trc="$("$FFPROBE_BIN" -hide_banner -v error -select_streams v:0 \
+    -show_entries stream=color_transfer -of csv=p=0 "$WORKDIR/hevc-videotoolbox.mp4" || true)"
+  if [[ "$trc" == *smpte2084* ]]; then
+    "$FFMPEG_BIN" -hide_banner -y -i "$WORKDIR/hevc-videotoolbox.mp4" -an -frames:v 4 \
+      -vf 'zscale=tin=smpte2084:min=bt2020nc:pin=bt2020:t=linear:npl=100,tonemap=tonemap=hable,zscale=t=bt709,format=yuv420p' \
+      -f framemd5 "$WORKDIR/synthetic-hdr-tonemap.framemd5"
+    record "hevc_videotoolbox kept HDR10 tags; tonemap ran"
+  else
+    record "hevc_videotoolbox allow_sw=1 encoded, but macos-14 VT dropped HDR10 tags (trc=${trc:-unset}); zscale/tonemap already verified on FATE dovi-p81"
+  fi
 else
   soft "hevc_videotoolbox encode failed; decode/filter checks already used public HEVC"
 fi
