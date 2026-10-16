@@ -5,6 +5,7 @@
     { "path": "packages/engine" },
     { "path": "packages/api" },
     { "path": "packages/core" },
+    { "path": "packages/adapters-node" },
     { "path": "apps/cli" },
     { "path": "apps/server" }
   ]

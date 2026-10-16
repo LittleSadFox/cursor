@@ -1,0 +1,25 @@
+{
+  "version": "0.0.0-placeholder",
+  "features": [
+    {
+      "name": "ankleLiftBodyHeights",
+      "dtype": "f32",
+      "description": "Min ankle height above floor / body height"
+    },
+    {
+      "name": "hipVerticalSpeedBodyHeights",
+      "dtype": "f32",
+      "description": "Hip vy normalized by body height"
+    },
+    {
+      "name": "wristsAboveShoulders",
+      "dtype": "bool",
+      "description": "Both wrists above shoulders"
+    },
+    {
+      "name": "onWallScore",
+      "dtype": "f32",
+      "description": "Heuristic on-wall score in [0,1]"
+    }
+  ]
+}

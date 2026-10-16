@@ -21,20 +21,30 @@ function writeU32(view: DataView, offset: number, value: number): void {
   view.setUint32(offset, value, true);
 }
 
+function readF32(view: DataView, offset: number): number {
+  return view.getFloat32(offset, true);
+}
+
+function writeF32(view: DataView, offset: number, value: number): void {
+  view.setFloat32(offset, value, true);
+}
+
 /**
  * Encode a PoseTrack to the posebin binary format (BUILD_PLAN §3.4).
  */
 export function writePosebin(track: PoseTrack): Uint8Array {
-  assertPoseTrackInvariants(track);
-  const headerJson = new TextEncoder().encode(JSON.stringify(track.header));
+  const header = PoseTrackHeaderSchema.parse(track.header);
+  assertPoseTrackInvariants({ ...track, header });
+  const headerJson = new TextEncoder().encode(JSON.stringify(header));
   const headerLen = headerJson.length;
   const headerEnd = 16 + headerLen;
   const dataStart = align8(headerEnd);
-  const n = track.header.frameCount;
+  const n = header.frameCount;
   const tBytes = n * 8;
   const perTrackBytes = n * LANDMARK_COUNT * LANDMARK_STRIDE * 4;
-  const total = dataStart + tBytes + track.header.tracks.length * perTrackBytes;
+  const total = dataStart + tBytes + header.tracks.length * perTrackBytes;
 
+  const normalized: PoseTrack = { ...track, header };
   const out = new Uint8Array(total);
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
 
@@ -45,13 +55,15 @@ export function writePosebin(track: PoseTrack): Uint8Array {
 
   let offset = dataStart;
   for (let i = 0; i < n; i++) {
-    view.setFloat64(offset + i * 8, track.tUs[i]!, true);
+    view.setFloat64(offset + i * 8, normalized.tUs[i]!, true);
   }
   offset += tBytes;
 
-  for (const ref of track.header.tracks) {
-    const buf = track.landmarksByTrack.get(ref.trackId)!;
-    out.set(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength), offset);
+  for (const ref of header.tracks) {
+    const buf = normalized.landmarksByTrack.get(ref.trackId)!;
+    for (let i = 0; i < buf.length; i++) {
+      writeF32(view, offset + i * 4, buf[i]!);
+    }
     offset += perTrackBytes;
   }
 
@@ -110,9 +122,10 @@ export function readPosebin(bytes: Uint8Array): PoseTrack {
   const landmarksByTrack = new Map<string, Float32Array>();
   let offset = dataStart + tBytes;
   for (const ref of header.tracks) {
-    const slice = bytes.subarray(offset, offset + perTrackBytes);
     const copy = new Float32Array(perTrackBytes / 4);
-    copy.set(new Float32Array(slice.buffer, slice.byteOffset, copy.length));
+    for (let i = 0; i < copy.length; i++) {
+      copy[i] = readF32(view, offset + i * 4);
+    }
     landmarksByTrack.set(ref.trackId, copy);
     offset += perTrackBytes;
   }

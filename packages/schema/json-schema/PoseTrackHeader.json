@@ -1,0 +1,131 @@
+{
+  "$ref": "#/definitions/PoseTrackHeader",
+  "definitions": {
+    "PoseTrackHeader": {
+      "type": "object",
+      "properties": {
+        "videoId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "detection",
+            "hq"
+          ]
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampleFps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "startUs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "endUs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "startUs",
+              "endUs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coordinateSpace": {
+          "type": "string",
+          "const": "display"
+        },
+        "displayWidth": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "displayHeight": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "rotation": {
+          "type": "number",
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "tracks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trackId": {
+                "type": "string",
+                "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+              },
+              "firstFrame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lastFrame": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "trackId",
+              "firstFrame",
+              "lastFrame"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "selectedTrackId": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "videoId",
+        "kind",
+        "runtime",
+        "model",
+        "sampleFps",
+        "windows",
+        "coordinateSpace",
+        "displayWidth",
+        "displayHeight",
+        "rotation",
+        "tracks",
+        "selectedTrackId",
+        "frameCount"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

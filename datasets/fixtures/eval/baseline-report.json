@@ -1,0 +1,44 @@
+{
+  "fixture": "baseline-synthetic-v0",
+  "detectorVersion": "heuristic-stub@0.0.0",
+  "toleranceUs": 500000,
+  "maxMatchUs": 2000000,
+  "caseCount": 4,
+  "labeledAttempts": 6,
+  "durationUs": 120000000,
+  "falsePositives": 1,
+  "falsePositivesPerMinute": 0.5,
+  "recall": {
+    "estimate": 0.8333333333333334,
+    "low": 0.4364905634363539,
+    "high": 0.9699474141282696,
+    "n": 6,
+    "successes": 5
+  },
+  "startWithinTolerance": {
+    "estimate": 0.6666666666666666,
+    "low": 0.2999883213415286,
+    "high": 0.903230667440783,
+    "n": 6,
+    "successes": 4
+  },
+  "endWithinTolerance": {
+    "estimate": 0.8333333333333334,
+    "low": 0.4364905634363539,
+    "high": 0.9699474141282696,
+    "n": 6,
+    "successes": 5
+  },
+  "medianStartErrorUs": {
+    "median": 100000,
+    "low": 50000,
+    "high": 1000000,
+    "n": 5
+  },
+  "medianEndErrorUs": {
+    "median": 100000,
+    "low": 50000,
+    "high": 200000,
+    "n": 5
+  }
+}

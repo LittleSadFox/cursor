@@ -93,9 +93,11 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## What exists today vs later
 
-**In tree now:** monorepo scaffolding (P0.1), schema v0.1 with posebin/signals/labels + tests
-(P0.2 started), stub `engine`/`api`/`core`, minimal web shell + Fastify `/health`, CLI
-`version`, CI, ADR/PR templates.
+**In tree now:** monorepo scaffolding (P0.1), schema **v1.0.0** (posebin/signals/labels/
+feature spec/dataset manifest + JSON Schema export), synthetic `coach eval` (P0.7 start),
+label-tool stub (P0.4), capture protocol + consent template (P0.3 docs), proposed ADR-001 /
+ADR-002, stub `engine`/`api`/`core`/`adapters-node`, minimal web shell + Fastify `/health`.
 
-**Not built yet:** real ingest/review UI, Electron packaging, pose runtime, ffmpeg pipeline,
-comparison, mobile. Implement those only when the matching phase item says so.
+**Blocked / not built yet:** real dataset media (P0.3), pose bake-off (P0.5–P0.6), shipped
+ffmpeg (P0.8), ingest/review UI, Electron packaging, comparison, mobile. Implement those only
+when the matching phase item says so and prerequisites exist.

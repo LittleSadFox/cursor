@@ -1,0 +1,100 @@
+{
+  "$ref": "#/definitions/EvalFixture",
+  "definitions": {
+    "EvalFixture": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detectorVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toleranceUs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxMatchUs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "durationUs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "labeled": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "startUs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "endUs": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "startUs",
+                    "endUs"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "predicted": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "startUs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "endUs": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "startUs",
+                    "endUs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "durationUs",
+              "labeled",
+              "predicted"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "name",
+        "detectorVersion",
+        "toleranceUs",
+        "maxMatchUs",
+        "cases"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

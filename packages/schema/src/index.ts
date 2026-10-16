@@ -25,6 +25,7 @@ export {
   PoseTrackHeaderSchema,
   landmarkOffset,
   assertPoseTrackInvariants,
+  assertTimestamps,
   type PoseTrackKind,
   type ActiveWindow,
   type PoseTrackRef,
@@ -49,18 +50,62 @@ export {
   LabelKindSchema,
   AttemptOutcomeSchema,
   ExitDirectionSchema,
+  LimbSchema,
   LabelExportRowSchema,
   TemporalLabelSchema,
   parseLabelJsonl,
   stringifyLabelJsonl,
+  parseTemporalLabelJsonl,
+  stringifyTemporalLabelJsonl,
   type LabelKind,
   type AttemptOutcome,
   type ExitDirection,
+  type Limb,
   type LabelExportRow,
   type TemporalLabel,
 } from './labels.js';
 
+export {
+  FeatureDtypeSchema,
+  FeatureFieldSchema,
+  FeatureSpecSchema,
+  FEATURE_SPEC_PLACEHOLDER,
+  parseFeatureSpec,
+  stringifyFeatureSpec,
+  type FeatureDtype,
+  type FeatureField,
+  type FeatureSpec,
+} from './feature-spec.js';
+
+export {
+  WallAngleSchema,
+  DatasetSplitSchema,
+  RecordingManifestEntrySchema,
+  DatasetManifestSchema,
+  RelativeMediaPathSchema,
+  parseDatasetManifest,
+  stringifyDatasetManifest,
+  countBySplit,
+  testSplitSha256Of,
+  type WallAngle,
+  type DatasetSplit,
+  type RecordingManifestEntry,
+  type DatasetManifest,
+} from './dataset.js';
+
+export {
+  ClimbRangeSchema,
+  EvalCaseSchema,
+  EvalFixtureSchema,
+  parseEvalFixture,
+  type ClimbRangeDto,
+  type EvalCase,
+  type EvalFixture,
+} from './eval-fixture.js';
+
+export { sha256Hex } from './sha256.js';
+
 export { exportJsonSchemas } from './json-schema.js';
 
-/** Schema package semver; derived data should record this. */
-export const SCHEMA_VERSION = '0.1.0';
+/** Schema package semver; derived data should record this. Tagged schema v1. */
+export const SCHEMA_VERSION = '1.0.0';

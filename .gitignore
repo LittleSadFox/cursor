@@ -13,6 +13,7 @@ coverage/
 datasets/media/
 research/**/__pycache__/
 research/**/.venv/
+research/pose-lab/fixtures/*.posebin
 *.pyc
 apps/desktop/out/
 apps/desktop/release/

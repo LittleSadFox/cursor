@@ -1,0 +1,116 @@
+:root {
+  --bg: #14201c;
+  --ink: #e7f2ec;
+  --muted: #9aafa4;
+  --accent: #d2f26b;
+  --line: #2c3f37;
+  --font: "Avenir Next", "Segoe UI", sans-serif;
+  --display: "Iowan Old Style", Palatino, Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font);
+  background:
+    radial-gradient(900px 500px at 0% 0%, #243a32, transparent 60%),
+    linear-gradient(160deg, #0e1613, var(--bg));
+  padding: 1.5rem;
+}
+
+header {
+  max-width: 52rem;
+  margin-bottom: 1.25rem;
+}
+
+.brand {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 2rem;
+}
+
+h1 {
+  margin: 0.25rem 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 1.25rem;
+}
+
+.lede {
+  margin: 0;
+  color: var(--muted);
+}
+
+main {
+  max-width: 52rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.controls {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+input {
+  border: 1px solid var(--line);
+  background: #0c1210;
+  color: var(--ink);
+  padding: 0.5rem 0.65rem;
+  border-radius: 0;
+}
+
+video {
+  width: 100%;
+  max-height: 60vh;
+  background: #000;
+  border: 1px solid var(--line);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#exportBtn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+pre {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  background: #0c1210;
+  min-height: 8rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}

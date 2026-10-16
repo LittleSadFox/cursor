@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Climbing Coach — Label tool</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <p class="brand">Climbing Coach</p>
+      <h1>Temporal label tool</h1>
+      <p class="lede">Mark climb boundaries and outcomes. Export JSONL for the schema.</p>
+    </header>
+
+    <main>
+      <section class="controls">
+        <label>
+          Video
+          <input id="videoFile" type="file" accept="video/*" />
+        </label>
+        <label>
+          Manifest (optional)
+          <input id="manifestFile" type="file" accept="application/json,.json" />
+        </label>
+        <label>
+          Video ULID
+          <input id="videoId" type="text" placeholder="01…" spellcheck="false" />
+        </label>
+        <label>
+          Subject ULID
+          <input id="subjectId" type="text" placeholder="01…" spellcheck="false" />
+        </label>
+      </section>
+
+      <video id="player" controls></video>
+
+      <section class="actions">
+        <button type="button" data-kind="climb_start">Mark climb start</button>
+        <button type="button" data-kind="climb_end">Mark climb end</button>
+        <button type="button" data-kind="outcome" data-outcome="fall">Outcome: fall</button>
+        <button type="button" data-kind="outcome" data-outcome="top">Outcome: top</button>
+        <button type="button" data-kind="outcome" data-outcome="drop">Outcome: drop</button>
+        <button type="button" data-kind="exit_direction" data-exit="top">Exit: top</button>
+        <button type="button" data-kind="exit_direction" data-exit="side">Exit: side</button>
+        <button type="button" data-kind="exit_direction" data-exit="bottom">Exit: bottom</button>
+        <button type="button" data-kind="limb_placement" data-limb="rh">Limb: RH</button>
+        <button type="button" data-kind="limb_placement" data-limb="lh">Limb: LH</button>
+        <button type="button" data-kind="limb_placement" data-limb="rf">Limb: RF</button>
+        <button type="button" data-kind="limb_placement" data-limb="lf">Limb: LF</button>
+        <button type="button" id="undoBtn">Undo last</button>
+        <button type="button" id="exportBtn">Download labels.jsonl</button>
+      </section>
+
+      <pre id="log" aria-live="polite"></pre>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

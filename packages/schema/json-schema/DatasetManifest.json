@@ -1,0 +1,166 @@
+{
+  "$ref": "#/definitions/DatasetManifest",
+  "definitions": {
+    "DatasetManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "datasetVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "testSplitRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "frozen": {
+          "type": "boolean",
+          "default": false
+        },
+        "captureProtocolVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "testSplitSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "recordings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+              },
+              "mediaPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "durationUs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "recordedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "climberId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boulderId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "gym": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grade": {
+                "type": "string",
+                "minLength": 1
+              },
+              "color": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lighting": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cameraDistanceM": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "cameraHeightM": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "wallAngle": {
+                "type": "string",
+                "enum": [
+                  "slab",
+                  "vert",
+                  "overhang",
+                  "roof"
+                ]
+              },
+              "attemptCount": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "handheld": {
+                "type": "boolean",
+                "default": false
+              },
+              "hdr": {
+                "type": "boolean",
+                "default": false
+              },
+              "hevc": {
+                "type": "boolean",
+                "default": false
+              },
+              "consentId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "split": {
+                "type": "string",
+                "enum": [
+                  "train",
+                  "dev",
+                  "test"
+                ]
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "mediaPath",
+              "sha256",
+              "durationUs",
+              "climberId",
+              "boulderId",
+              "gym",
+              "grade",
+              "color",
+              "lighting",
+              "cameraDistanceM",
+              "cameraHeightM",
+              "wallAngle",
+              "attemptCount",
+              "consentId",
+              "split"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "datasetVersion",
+        "description",
+        "testSplitRatio",
+        "recordings"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
