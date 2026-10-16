@@ -28,6 +28,10 @@
           "type": "string",
           "minLength": 1
         },
+        "testSplitSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
         "recordings": {
           "type": "array",
           "items": {
@@ -57,9 +61,33 @@
                 "type": "string",
                 "minLength": 1
               },
+              "boulderId": {
+                "type": "string",
+                "minLength": 1
+              },
               "gym": {
                 "type": "string",
                 "minLength": 1
+              },
+              "grade": {
+                "type": "string",
+                "minLength": 1
+              },
+              "color": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lighting": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cameraDistanceM": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "cameraHeightM": {
+                "type": "number",
+                "exclusiveMinimum": 0
               },
               "wallAngle": {
                 "type": "string",
@@ -108,6 +136,13 @@
               "sha256",
               "durationUs",
               "climberId",
+              "boulderId",
+              "gym",
+              "grade",
+              "color",
+              "lighting",
+              "cameraDistanceM",
+              "cameraHeightM",
               "wallAngle",
               "attemptCount",
               "consentId",

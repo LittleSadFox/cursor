@@ -1,28 +1,31 @@
 #!/usr/bin/env node
 /**
- * Write a posebin fixture from the TypeScript writer for Python to read (P0.2).
+ * Write a deterministic posebin fixture from the TypeScript writer (P0.2).
+ * Requires a prior `pnpm --filter @climbing-coach/schema build`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  LANDMARK_COUNT,
-  LANDMARK_STRIDE,
-  writePosebin,
-} from '../dist/index.js';
+import { LANDMARK_COUNT, LANDMARK_STRIDE, writePosebin } from '../dist/index.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const OUT = join(ROOT, 'research/pose-lab/fixtures/from-ts.posebin');
 
 const VIDEO_ID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
-const TRACK_ID = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
-const frameCount = 3;
-const landmarks = new Float32Array(frameCount * LANDMARK_COUNT * LANDMARK_STRIDE);
-landmarks[0] = 0.42;
-landmarks[1] = 0.24;
-landmarks[4] = Number.NaN;
-const tUs = new Float64Array([16_000_000 + 7, 16_033_333, 16_066_666]);
+const TRACK_A = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
+const TRACK_B = '01ARZ3NDEKTSV4RRFFQ69G5FAX';
+const frameCount = 4;
+
+function fill(seed) {
+  const landmarks = new Float32Array(frameCount * LANDMARK_COUNT * LANDMARK_STRIDE);
+  for (let i = 0; i < landmarks.length; i++) {
+    landmarks[i] = ((seed + i) % 17) / 20;
+  }
+  landmarks[4] = Number.NaN;
+  landmarks[landmarks.length - 1] = Number.NaN;
+  return landmarks;
+}
 
 const bytes = writePosebin({
   header: {
@@ -31,17 +34,26 @@ const bytes = writePosebin({
     runtime: 'typescript',
     model: 'fixture',
     sampleFps: 15,
-    windows: [{ startUs: 16_000_000, endUs: 16_100_000 }],
+    windows: [
+      { startUs: 0, endUs: 100_000 },
+      { startUs: 2_000_000, endUs: 2_100_000 },
+    ],
     coordinateSpace: 'display',
     displayWidth: 1080,
     displayHeight: 1920,
-    rotation: 0,
-    tracks: [{ trackId: TRACK_ID, firstFrame: 0, lastFrame: frameCount - 1 }],
-    selectedTrackId: TRACK_ID,
+    rotation: 90,
+    tracks: [
+      { trackId: TRACK_A, firstFrame: 0, lastFrame: frameCount - 1 },
+      { trackId: TRACK_B, firstFrame: 1, lastFrame: frameCount - 1 },
+    ],
+    selectedTrackId: TRACK_A,
     frameCount,
   },
-  tUs,
-  landmarksByTrack: new Map([[TRACK_ID, landmarks]]),
+  tUs: new Float64Array([0, 33_333, 2_000_000, 2_033_333]),
+  landmarksByTrack: new Map([
+    [TRACK_A, fill(1)],
+    [TRACK_B, fill(3)],
+  ]),
 });
 
 mkdirSync(dirname(OUT), { recursive: true });

@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import {
   SCHEMA_VERSION,
   exportJsonSchemas,
-  FEATURE_SPEC_V1,
+  FEATURE_SPEC_PLACEHOLDER,
   stringifyFeatureSpec,
 } from '@climbing-coach/schema';
 
@@ -34,7 +34,7 @@ function runSchemaExport(outDir: string): void {
   for (const [name, doc] of Object.entries(docs)) {
     writeFileSync(resolve(outDir, `${name}.json`), `${JSON.stringify(doc, null, 2)}\n`);
   }
-  writeFileSync(resolve(outDir, 'feature_spec.json'), stringifyFeatureSpec(FEATURE_SPEC_V1));
+  writeFileSync(resolve(outDir, 'feature_spec.json'), stringifyFeatureSpec(FEATURE_SPEC_PLACEHOLDER));
   console.log(`exported ${Object.keys(docs).length + 1} files to ${outDir}`);
 }
 

@@ -36,26 +36,96 @@ export const LabelExportRowSchema = z.object({
 });
 export type LabelExportRow = z.infer<typeof LabelExportRowSchema>;
 
-/** Temporal annotation used by research/label-tool and eval fixtures. */
-export const TemporalLabelSchema = z.object({
+const labelBase = {
   id: UlidSchema,
-  kind: LabelKindSchema,
   subjectId: UlidSchema,
   videoId: UlidSchema.optional(),
-  tUs: UsSchema.optional(),
-  startUs: UsSchema.optional(),
-  endUs: UsSchema.optional(),
-  outcome: AttemptOutcomeSchema.optional(),
-  exitDirection: ExitDirectionSchema.optional(),
-  limb: LimbSchema.optional(),
-  /** Partner attempt id for move_correspondence rows. */
-  otherSubjectId: UlidSchema.optional(),
-  moveIndex: z.number().int().nonnegative().optional(),
-  otherMoveIndex: z.number().int().nonnegative().optional(),
+  sourceVersion: z.string().min(1),
   predicted: z.record(z.unknown()).optional(),
   final: z.record(z.unknown()).optional(),
-  sourceVersion: z.string().min(1),
+};
+
+const ClimbStartLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('climb_start'),
+  tUs: UsSchema,
 });
+
+const ClimbEndLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('climb_end'),
+  tUs: UsSchema,
+});
+
+const OutcomeLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('outcome'),
+  outcome: AttemptOutcomeSchema,
+  tUs: UsSchema.optional(),
+});
+
+const ExitDirectionLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('exit_direction'),
+  exitDirection: ExitDirectionSchema,
+  tUs: UsSchema,
+});
+
+const LimbPlacementLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('limb_placement'),
+  limb: LimbSchema,
+  tUs: UsSchema,
+});
+
+const MoveCorrespondenceLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('move_correspondence'),
+  otherSubjectId: UlidSchema,
+  moveIndex: z.number().int().nonnegative(),
+  otherMoveIndex: z.number().int().nonnegative(),
+});
+
+const BoundaryCorrectionLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('boundary_correction'),
+  startUs: UsSchema,
+  endUs: UsSchema,
+});
+
+const AlignmentFeedbackLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('alignment_feedback'),
+  moveIndex: z.number().int().nonnegative().optional(),
+});
+
+const InsightFeedbackLabelSchema = z.object({
+  ...labelBase,
+  kind: z.literal('insight_feedback'),
+});
+
+/** Temporal annotation used by research/label-tool and eval fixtures. Fields depend on `kind`. */
+export const TemporalLabelSchema = z
+  .discriminatedUnion('kind', [
+    ClimbStartLabelSchema,
+    ClimbEndLabelSchema,
+    OutcomeLabelSchema,
+    ExitDirectionLabelSchema,
+    LimbPlacementLabelSchema,
+    MoveCorrespondenceLabelSchema,
+    BoundaryCorrectionLabelSchema,
+    AlignmentFeedbackLabelSchema,
+    InsightFeedbackLabelSchema,
+  ])
+  .superRefine((row, ctx) => {
+    if (row.kind === 'boundary_correction' && row.endUs < row.startUs) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'endUs must be >= startUs',
+        path: ['endUs'],
+      });
+    }
+  });
 export type TemporalLabel = z.infer<typeof TemporalLabelSchema>;
 
 function parseJsonlLines<T>(text: string, parseRow: (value: unknown) => T): T[] {

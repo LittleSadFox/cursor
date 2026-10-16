@@ -17,9 +17,12 @@ export const FeatureSpecSchema = z.object({
 });
 export type FeatureSpec = z.infer<typeof FeatureSpecSchema>;
 
-/** Placeholder frame-level feature order until engine/features lands in P1. */
-export const FEATURE_SPEC_V1: FeatureSpec = {
-  version: '1.0.0',
+/**
+ * Placeholder frame-level feature order until `engine/features` lands in P1.
+ * Version is intentionally not `1.0.0` so the real spec can take that number.
+ */
+export const FEATURE_SPEC_PLACEHOLDER: FeatureSpec = {
+  version: '0.0.0-placeholder',
   features: [
     { name: 'ankleLiftBodyHeights', dtype: 'f32', description: 'Min ankle height above floor / body height' },
     { name: 'hipVerticalSpeedBodyHeights', dtype: 'f32', description: 'Hip vy normalized by body height' },

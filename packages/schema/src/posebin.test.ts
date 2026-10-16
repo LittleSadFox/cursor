@@ -84,4 +84,72 @@ describe('posebin', () => {
     bytes[0] = 0x00;
     expect(() => readPosebin(bytes)).toThrow(/magic/);
   });
+
+  it('reads an unaligned view without throwing RangeError', () => {
+    const bytes = writePosebin(makeTrack(2));
+    const padded = new Uint8Array(bytes.byteLength + 1);
+    padded.set(bytes, 1);
+    const view = padded.subarray(1);
+    expect(view.byteOffset % 4).not.toBe(0);
+    const decoded = readPosebin(view);
+    expect(decoded.tUs[1]).toBe(1_000_000 + 33_333);
+    expect(Buffer.from(writePosebin(decoded))).toEqual(Buffer.from(bytes));
+  });
+
+  it('rejects a selectedTrackId that is not in tracks', () => {
+    const track = makeTrack(2);
+    track.header.selectedTrackId = '01ARZ3NDEKTSV4RRFFQ69G5FAX';
+    expect(() => writePosebin(track)).toThrow(/selectedTrackId/);
+  });
+
+  it('rejects duplicate track ids', () => {
+    const track = makeTrack(2);
+    track.header.tracks = [
+      { trackId: TRACK_ID, firstFrame: 0, lastFrame: 1 },
+      { trackId: TRACK_ID, firstFrame: 0, lastFrame: 1 },
+    ];
+    expect(() => writePosebin(track)).toThrow(/duplicate trackId/);
+  });
+
+  it('rejects lastFrame past frameCount', () => {
+    const track = makeTrack(2);
+    track.header.tracks = [{ trackId: TRACK_ID, firstFrame: 0, lastFrame: 999 }];
+    expect(() => writePosebin(track)).toThrow(/lastFrame/);
+  });
+
+  it('rejects non-integer, negative, and non-monotonic timestamps', () => {
+    const fractional = makeTrack(2);
+    fractional.tUs[1] = 1.5;
+    expect(() => writePosebin(fractional)).toThrow(/integer/);
+
+    const negative = makeTrack(1);
+    negative.tUs[0] = -3;
+    expect(() => writePosebin(negative)).toThrow(/integer|non-negative/);
+
+    const backwards = makeTrack(2);
+    backwards.tUs[0] = 5;
+    backwards.tUs[1] = 4;
+    expect(() => writePosebin(backwards)).toThrow(/strictly increasing/);
+  });
+
+  it('rejects an inverted active window', () => {
+    const track = makeTrack(2);
+    track.header.windows = [{ startUs: us(2_000_000), endUs: us(1_000_000) }];
+    expect(() => writePosebin(track)).toThrow(/endUs/);
+  });
+
+  it('rejects a bad version, an overrun header, and invalid header JSON', () => {
+    const version = writePosebin(makeTrack(1));
+    version[8] = 99;
+    expect(() => readPosebin(version)).toThrow(/version/);
+
+    const overrun = writePosebin(makeTrack(1));
+    const view = new DataView(overrun.buffer, overrun.byteOffset, overrun.byteLength);
+    view.setUint32(12, 0xfffffff0, true);
+    expect(() => readPosebin(overrun)).toThrow(/overruns/);
+
+    const invalid = writePosebin(makeTrack(1));
+    invalid[16] = 0x00;
+    expect(() => readPosebin(invalid)).toThrow(/JSON|header/);
+  });
 });

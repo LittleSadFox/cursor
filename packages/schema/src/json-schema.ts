@@ -1,4 +1,5 @@
 import { DatasetManifestSchema } from './dataset.js';
+import { EvalFixtureSchema } from './eval-fixture.js';
 import { FeatureSpecSchema } from './feature-spec.js';
 import { LabelExportRowSchema, TemporalLabelSchema } from './labels.js';
 import { PoseTrackHeaderSchema } from './pose-track.js';
@@ -14,5 +15,6 @@ export function exportJsonSchemas(): Record<string, unknown> {
     TemporalLabel: zodToJsonSchema(TemporalLabelSchema, 'TemporalLabel'),
     FeatureSpec: zodToJsonSchema(FeatureSpecSchema, 'FeatureSpec'),
     DatasetManifest: zodToJsonSchema(DatasetManifestSchema, 'DatasetManifest'),
+    EvalFixture: zodToJsonSchema(EvalFixtureSchema, 'EvalFixture'),
   };
 }

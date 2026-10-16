@@ -10,7 +10,9 @@ export { bootstrapMedianCi, type MedianInterval } from './eval/bootstrap.js';
 export {
   matchClimbRanges,
   scoreDetection,
-  type ClimbRange,
+  falsePositivesPerMinute,
   type BoundaryMatch,
   type DetectionScore,
+  type MatchOptions,
 } from './eval/detection.js';
+export { overlapUs, rangesOverlap, type ClimbRange } from './eval/ranges.js';

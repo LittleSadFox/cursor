@@ -25,6 +25,7 @@ export {
   PoseTrackHeaderSchema,
   landmarkOffset,
   assertPoseTrackInvariants,
+  assertTimestamps,
   type PoseTrackKind,
   type ActiveWindow,
   type PoseTrackRef,
@@ -68,7 +69,7 @@ export {
   FeatureDtypeSchema,
   FeatureFieldSchema,
   FeatureSpecSchema,
-  FEATURE_SPEC_V1,
+  FEATURE_SPEC_PLACEHOLDER,
   parseFeatureSpec,
   stringifyFeatureSpec,
   type FeatureDtype,
@@ -81,14 +82,28 @@ export {
   DatasetSplitSchema,
   RecordingManifestEntrySchema,
   DatasetManifestSchema,
+  RelativeMediaPathSchema,
   parseDatasetManifest,
   stringifyDatasetManifest,
   countBySplit,
+  testSplitSha256Of,
   type WallAngle,
   type DatasetSplit,
   type RecordingManifestEntry,
   type DatasetManifest,
 } from './dataset.js';
+
+export {
+  ClimbRangeSchema,
+  EvalCaseSchema,
+  EvalFixtureSchema,
+  parseEvalFixture,
+  type ClimbRangeDto,
+  type EvalCase,
+  type EvalFixture,
+} from './eval-fixture.js';
+
+export { sha256Hex } from './sha256.js';
 
 export { exportJsonSchemas } from './json-schema.js';
 

@@ -3,39 +3,31 @@ import { readFileSync } from 'node:fs';
 import {
   bootstrapMedianCi,
   createMulberry32,
+  falsePositivesPerMinute,
   scoreDetection,
   wilsonInterval,
-  type ClimbRange,
 } from '@climbing-coach/engine';
-
-export type EvalCase = {
-  id: string;
-  labeled: ClimbRange[];
-  predicted: ClimbRange[];
-};
-
-export type EvalFixture = {
-  name: string;
-  detectorVersion: string;
-  toleranceUs: number;
-  cases: EvalCase[];
-};
+import { parseEvalFixture, type EvalFixture } from '@climbing-coach/schema';
 
 export type EvalReport = {
   fixture: string;
   detectorVersion: string;
   toleranceUs: number;
+  maxMatchUs: number;
   caseCount: number;
   labeledAttempts: number;
+  durationUs: number;
+  falsePositives: number;
+  falsePositivesPerMinute: number;
   recall: ReturnType<typeof wilsonInterval>;
-  startWithin0_5s: ReturnType<typeof wilsonInterval>;
-  endWithin0_5s: ReturnType<typeof wilsonInterval>;
+  startWithinTolerance: ReturnType<typeof wilsonInterval>;
+  endWithinTolerance: ReturnType<typeof wilsonInterval>;
   medianStartErrorUs: ReturnType<typeof bootstrapMedianCi>;
   medianEndErrorUs: ReturnType<typeof bootstrapMedianCi>;
 };
 
 export function loadEvalFixture(path: string): EvalFixture {
-  return JSON.parse(readFileSync(path, 'utf8')) as EvalFixture;
+  return parseEvalFixture(JSON.parse(readFileSync(path, 'utf8')));
 }
 
 export function runEval(fixture: EvalFixture, seed = 42): EvalReport {
@@ -45,13 +37,21 @@ export function runEval(fixture: EvalFixture, seed = 42): EvalReport {
   let matched = 0;
   let startWithin = 0;
   let endWithin = 0;
+  let falsePositives = 0;
+  let durationUs = 0;
 
   for (const testCase of fixture.cases) {
-    const score = scoreDetection(testCase.predicted, testCase.labeled, fixture.toleranceUs);
+    const score = scoreDetection(testCase.predicted, testCase.labeled, {
+      toleranceUs: fixture.toleranceUs,
+      maxMatchUs: fixture.maxMatchUs,
+      durationUs: testCase.durationUs,
+    });
     labeledAttempts += score.labeledCount;
     matched += score.matchedCount;
     startWithin += score.startWithinCount;
     endWithin += score.endWithinCount;
+    falsePositives += score.falsePositives;
+    durationUs += testCase.durationUs;
     startErrors.push(...score.startErrorsUs);
     endErrors.push(...score.endErrorsUs);
   }
@@ -60,11 +60,15 @@ export function runEval(fixture: EvalFixture, seed = 42): EvalReport {
     fixture: fixture.name,
     detectorVersion: fixture.detectorVersion,
     toleranceUs: fixture.toleranceUs,
+    maxMatchUs: fixture.maxMatchUs,
     caseCount: fixture.cases.length,
     labeledAttempts,
+    durationUs,
+    falsePositives,
+    falsePositivesPerMinute: falsePositivesPerMinute(falsePositives, durationUs),
     recall: wilsonInterval(matched, labeledAttempts),
-    startWithin0_5s: wilsonInterval(startWithin, labeledAttempts),
-    endWithin0_5s: wilsonInterval(endWithin, labeledAttempts),
+    startWithinTolerance: wilsonInterval(startWithin, labeledAttempts),
+    endWithinTolerance: wilsonInterval(endWithin, labeledAttempts),
     medianStartErrorUs: bootstrapMedianCi(startErrors, {
       iterations: 1000,
       rng: createMulberry32(seed),
@@ -76,18 +80,25 @@ export function runEval(fixture: EvalFixture, seed = 42): EvalReport {
   };
 }
 
+function formatPercent(value: number): string {
+  return Number.isNaN(value) ? 'n/a' : `${(value * 100).toFixed(1)}%`;
+}
+
+function formatMs(value: number): string {
+  return Number.isNaN(value) ? 'n/a' : `${(value / 1000).toFixed(0)} ms`;
+}
+
 export function formatEvalReport(report: EvalReport): string {
-  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-  const us = (x: number) => `${(x / 1000).toFixed(0)} ms`;
   return [
     `eval: ${report.fixture}`,
     `detector: ${report.detectorVersion}`,
     `cases: ${report.caseCount}  labeled attempts: ${report.labeledAttempts}`,
-    `tolerance: ${report.toleranceUs / 1_000_000}s`,
-    `recall: ${pct(report.recall.estimate)}  95% CI [${pct(report.recall.low)}, ${pct(report.recall.high)}]`,
-    `start ≤0.5s: ${pct(report.startWithin0_5s.estimate)}  95% CI [${pct(report.startWithin0_5s.low)}, ${pct(report.startWithin0_5s.high)}]`,
-    `end ≤0.5s: ${pct(report.endWithin0_5s.estimate)}  95% CI [${pct(report.endWithin0_5s.low)}, ${pct(report.endWithin0_5s.high)}]`,
-    `median |Δstart|: ${us(report.medianStartErrorUs.median)}  95% CI [${us(report.medianStartErrorUs.low)}, ${us(report.medianStartErrorUs.high)}]`,
-    `median |Δend|: ${us(report.medianEndErrorUs.median)}  95% CI [${us(report.medianEndErrorUs.low)}, ${us(report.medianEndErrorUs.high)}]`,
+    `tolerance: ${report.toleranceUs / 1_000_000}s  maxMatch: ${report.maxMatchUs / 1_000_000}s`,
+    `recall: ${formatPercent(report.recall.estimate)}  95% CI [${formatPercent(report.recall.low)}, ${formatPercent(report.recall.high)}]`,
+    `start within tolerance: ${formatPercent(report.startWithinTolerance.estimate)}  95% CI [${formatPercent(report.startWithinTolerance.low)}, ${formatPercent(report.startWithinTolerance.high)}]`,
+    `end within tolerance: ${formatPercent(report.endWithinTolerance.estimate)}  95% CI [${formatPercent(report.endWithinTolerance.low)}, ${formatPercent(report.endWithinTolerance.high)}]`,
+    `false positives: ${report.falsePositives}  (${report.falsePositivesPerMinute.toFixed(3)} / min)`,
+    `median |Δstart|: ${formatMs(report.medianStartErrorUs.median)}  95% CI [${formatMs(report.medianStartErrorUs.low)}, ${formatMs(report.medianStartErrorUs.high)}]`,
+    `median |Δend|: ${formatMs(report.medianEndErrorUs.median)}  95% CI [${formatMs(report.medianEndErrorUs.low)}, ${formatMs(report.medianEndErrorUs.high)}]`,
   ].join('\n');
 }

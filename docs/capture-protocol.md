@@ -32,11 +32,14 @@ Robustness extras (few clips, flagged in the manifest): HEVC, HDR, handheld / pa
 
 ## Session metadata (required per recording)
 
-- Gym name, boulder grade/color, wall angle (`slab` / `vert` / `overhang` / `roof`)
-- Climber id (must match a consent record)
-- Lighting notes, camera distance/height, handheld flag
-- Approximate attempt count
-- Consent id
+These fields are required by `DatasetManifest` in `@climbing-coach/schema`:
+
+- `gym`, boulder `grade` and `color`, `boulderId` (stable id for that set problem)
+- Wall angle (`slab` / `vert` / `overhang` / `roof`)
+- `climberId` (must match a consent record) and `consentId`
+- `lighting`, `cameraDistanceM`, `cameraHeightM`, handheld / HDR / HEVC flags
+- Approximate `attemptCount`
+- `mediaPath`: relative to the private media root, with no `..` segments
 
 ## Consent
 
@@ -47,8 +50,14 @@ strings appear in `datasets/manifest.json`.
 
 1. Compute `sha256` of each media file; set `mediaPath` relative to the private root.
 2. Assign `split`: `train` / `dev` / `test` with `testSplitRatio ≈ 0.3` of *recordings*
-   (not attempts). Freeze hashes before detector tuning — set `frozen: true`.
-3. Validate with `@climbing-coach/schema` `DatasetManifestSchema`.
+   (not attempts). Group by `climberId` + `boulderId`: the same climber on the same boulder
+   must not appear in more than one split (that leaks into frozen-split metrics). Different
+   climbers on one boulder, or one climber on different boulders, may sit in different splits.
+3. Freeze hashes before detector tuning — set `frozen: true` and `testSplitSha256` to the
+   SHA-256 (hex) of the test-split recording hashes sorted lexicographically and joined with
+   `\n` (no trailing newline). An empty test split hashes the empty string. The schema
+   rejects a frozen manifest whose hash does not match.
+4. Validate with `@climbing-coach/schema` `DatasetManifestSchema`.
 
 ## Checklist before freeze
 

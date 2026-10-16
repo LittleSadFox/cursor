@@ -9,6 +9,7 @@ describe('exportJsonSchemas', () => {
     expect(Object.keys(docs).sort()).toEqual(
       [
         'DatasetManifest',
+        'EvalFixture',
         'FeatureSpec',
         'LabelExportRow',
         'PoseTrackHeader',

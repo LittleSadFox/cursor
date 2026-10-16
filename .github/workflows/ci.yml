@@ -34,12 +34,6 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
-
-      - name: Dependency boundaries
-        run: pnpm deps:check
-
       - name: Export schema JSON + TS posebin fixture
         run: |
           pnpm --filter @climbing-coach/schema build
@@ -51,10 +45,19 @@ jobs:
           python3 -m pip install --user pytest
           python3 -m pytest research/pose-lab/tests -q
 
+      - name: Test
+        run: pnpm test
+
+      - name: Dependency boundaries
+        run: pnpm deps:check
+
       - name: Baseline coach eval (synthetic)
         run: |
           pnpm --filter @climbing-coach/cli build
           node apps/cli/dist/main.js eval --fixture datasets/fixtures/eval/baseline-synthetic.json --json datasets/fixtures/eval/baseline-report.json
+
+      - name: Generated artifacts match the commit
+        run: git diff --exit-code -- packages/schema/json-schema datasets/fixtures/eval
 
   macos:
     name: Smoke (macOS arm64)
