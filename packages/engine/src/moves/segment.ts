@@ -37,21 +37,20 @@ export function stationaryPeriods(
 ): StationaryPeriod[] {
   const inside = samples.filter((sample) => inRange(sample.tUs, range));
   const periods: StationaryPeriod[] = [];
-  let index = 0;
-  while (index < inside.length) {
-    if (index > 0 && limbSpeed(inside, index, limb) >= params.stationaryLimbTorsoPerSec) {
-      index += 1;
-      continue;
-    }
-    let end = index + 1;
-    while (end < inside.length && limbSpeed(inside, end, limb) < params.stationaryLimbTorsoPerSec) {
-      end += 1;
-    }
-    const run = inside.slice(index, end);
+  const close = (first: number, last: number): void => {
+    const run = inside.slice(first, last + 1);
     const duration = (run[run.length - 1]?.tUs ?? 0) - (run[0]?.tUs ?? 0);
     if (duration >= params.stationaryMinUs) periods.push(periodFrom(run, limb));
-    index = Math.max(end, index + 1);
+  };
+  // A run is frames joined by slow steps. It starts on the frame the limb arrived at.
+  // A missing (NaN) position makes the step not slow, so it splits the run.
+  let runStart = 0;
+  for (let index = 1; index < inside.length; index += 1) {
+    if (limbSpeed(inside, index, limb) < params.stationaryLimbTorsoPerSec) continue;
+    close(runStart, index - 1);
+    runStart = index;
   }
+  if (inside.length > 0) close(runStart, inside.length - 1);
   return periods;
 }
 
@@ -77,9 +76,9 @@ function periodFrom(run: readonly PoseSample[], limb: MoveLimb): StationaryPerio
 function limbSpeed(samples: readonly PoseSample[], index: number, limb: MoveLimb): number {
   const current = samples[index];
   const previous = samples[index - 1];
-  if (!current || !previous) return 0;
+  if (!current || !previous) return Number.NaN;
   const dt = (current.tUs - previous.tUs) / 1_000_000;
-  if (dt <= 0) return 0;
+  if (dt <= 0) return Number.NaN;
   const torso = Math.max(torsoLength(current), 1e-6);
   const a = landmark(current, limb as BlazePoseLandmark);
   const b = landmark(previous, limb as BlazePoseLandmark);
