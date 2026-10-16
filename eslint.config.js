@@ -43,6 +43,7 @@ export default [
   },
   {
     ignores: [
+      'packages/core/src/test/**',
       'packages/config/**',
       'packages/**/scripts/**',
       'research/**',

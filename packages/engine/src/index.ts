@@ -1,5 +1,5 @@
 /**
- * Pure analysis algorithms (PLAN 2.1–2.7).
+ * Pure analysis algorithms (PLAN 2.1–2.9, 2.11).
  * Video decode and the pose runtime stay in adapters (P1.7, P1.8).
  */
 export const ENGINE_VERSION = '0.1.0';
@@ -85,3 +85,29 @@ export { collapseRests, type RestCollapseParams } from './align/rest.js';
 export { bandedDtw, openEndDtw, type DtwResult, type DtwStep } from './align/dtw.js';
 export { reduceFeatures } from './align/pca.js';
 export { align, type AlignFrame, type AlignOptions, type AlignResult } from './align/align.js';
+
+export { GRADE_SYSTEMS, BOULDER_SYSTEMS, ROUTE_SYSTEMS, isGradeSystem, type GradeSystem } from './grades/systems.js';
+export { toDifficultyIndex, formatGrade, parseGrade } from './grades/convert.js';
+
+export { addDays, eachDay, isoWeek, daysBetween } from './stats/dates.js';
+export { sessionLoad } from './stats/load.js';
+export { prefillTrainingLog } from './stats/prefill.js';
+export { rollingAverages, ewmaLoad } from './stats/averages.js';
+export { acwr, acwrBand } from './stats/acwr.js';
+export { trainingLoad } from './stats/training-load.js';
+export { exertionVolume, focusDistribution, gradePyramid, weeklySummary } from './stats/charts.js';
+export type {
+  AcwrBand,
+  AttemptSummary,
+  DailyLoadPoint,
+  DailyLog,
+  DateRange,
+  Discipline,
+  ExertionVolumePoint,
+  FocusBucket,
+  GradeTally,
+  LoadMethod,
+  TrainingLoadSeries,
+  TrainingLogPrefill,
+  WeeklySummary,
+} from './stats/types.js';

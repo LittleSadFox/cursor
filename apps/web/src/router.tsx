@@ -1,0 +1,64 @@
+import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
+
+import { api } from './api.js';
+import { HomePage } from './pages/home.js';
+import { PlaceholderPage } from './pages/placeholder.js';
+import { SettingsPage } from './pages/settings.js';
+import { SetupPage } from './pages/setup.js';
+import { TrashPage } from './pages/trash.js';
+import { Shell } from './ui/shell.js';
+
+const rootRoute = createRootRoute({
+  component: Shell,
+});
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  beforeLoad: async () => {
+    const settings = await api.system.getSettings();
+    if (!settings.libraryReady) throw redirect({ to: '/setup' });
+  },
+  component: HomePage,
+});
+
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  component: SetupPage,
+});
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  component: SettingsPage,
+});
+
+const trashRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trash',
+  component: TrashPage,
+});
+
+const libraryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library',
+  component: () => <PlaceholderPage messageId="placeholder.library" />,
+});
+
+const recordingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recordings',
+  component: () => <PlaceholderPage messageId="placeholder.recordings" />,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  setupRoute,
+  settingsRoute,
+  trashRoute,
+  libraryRoute,
+  recordingsRoute,
+]);
+
+export const router = createRouter({ routeTree });

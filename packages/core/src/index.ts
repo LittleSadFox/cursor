@@ -1,14 +1,13 @@
-import { defaultHealth, type CoachApi, type HealthResponse } from '@climbing-coach/api';
-import { ENGINE_VERSION } from '@climbing-coach/engine';
-
-/**
- * Application services implementing CoachApi (P2-A).
- * Scaffolding stub: health only.
- */
-export function createCoreApi(): CoachApi {
-  return {
-    async health(): Promise<HealthResponse> {
-      return defaultHealth({ engineVersion: ENGINE_VERSION });
-    },
-  };
-}
+export { createCoreApi, type CoreDeps } from './create-api.js';
+export { applyMigrations, appliedMigrationIds } from './db/migrate.js';
+export { MIGRATIONS } from './db/migrations.js';
+export * as dbSchema from './db/schema.js';
+export { createIdGen, encodeUlid, sequentialRandomBytes, type IdGen, type RandomBytes } from './ids/ulid.js';
+export { createJobRunner, type JobRunner } from './jobs/runner.js';
+export { P2A_PIPELINES } from './jobs/pipelines.js';
+export { isSyncFolder } from './library/sync-folder.js';
+export { addDaysIso } from './library/retention.js';
+export { systemClock, isoFromMs, type Clock } from './ports/clock.js';
+export { createEventBus, type EventBus } from './ports/events.js';
+export { silentLogger, type Logger } from './ports/logger.js';
+export type { AppDatabase, SqlExecutor, SqlValue, SqliteBackup } from './ports/sql.js';

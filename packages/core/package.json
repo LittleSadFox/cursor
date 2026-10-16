@@ -20,9 +20,12 @@
   "dependencies": {
     "@climbing-coach/api": "workspace:*",
     "@climbing-coach/engine": "workspace:*",
-    "@climbing-coach/schema": "workspace:*"
+    "@climbing-coach/schema": "workspace:*",
+    "drizzle-orm": "^0.44.5"
   },
   "devDependencies": {
-    "@climbing-coach/config": "workspace:*"
+    "@climbing-coach/config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.4.1"
   }
 }

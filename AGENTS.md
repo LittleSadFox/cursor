@@ -9,9 +9,9 @@ propose auto-cuts, rate proximity + exertion, store a library, and later compare
 follow. Windows/Linux/Intel Mac are out of scope for v1.
 
 Do not invent a greenfield product. Follow the plans; if ambiguous, pick the clearest path,
-note the assumption in the PR, and keep building. Phase 0 foundations and the Phase 1 pure engine (activity through alignment) are in
-tree. Next work is the blocked Phase 1 remainder (video tools, pose adapter, dev-split
-tuning) once a dataset and macOS ffmpeg exist, then Phase 2.
+note the assumption in the PR, and keep building. Phase 0, Phase 1 engine, and Phase 2-A
+(backend, shell, homepage) are in tree. Next unblocked work is more 2-A polish; ingest
+(P2-B) waits on a dataset, ADR-001, and macOS ffmpeg.
 
 ## Plans and decisions
 
@@ -31,10 +31,10 @@ Phase IDs (P0.1, P2-A.5, …) in commits/PRs should match `BUILD_PLAN` §5.
 apps/web          React + Vite renderer (browser dev; later Electron)
 apps/server       Fastify local API (127.0.0.1)
 apps/cli          `coach` CLI: eval, detect, align, cut --draft, bench; video process waits on ffmpeg
-apps/desktop      Electron packaging placeholder (P2)
+apps/desktop      Electron `app://-` protocol + macOS menu (P2-A.4); packaging is P2-D
 packages/schema   Types, Zod, posebin/signals/labels (no deps but Zod)
 packages/engine   Pure algorithms — no I/O, no Node/DOM, no clocks/IDs
-packages/api      DTOs, CoachApi contract
+packages/api      DTOs, CoachApi, HTTP client, conformance suite
 packages/core     Use cases, DB, jobs (no HTTP/Electron/React)
 packages/config   Shared tsconfig / ESLint / Vitest presets
 packages/test-fixtures  Synthetic climber and activity frames (no engine import)
@@ -66,8 +66,8 @@ pnpm build
 | Unit tests        | `pnpm test`                                                       |
 | Module boundaries | `pnpm deps:check`                                                 |
 | Full local check  | `pnpm verify`                                                     |
-| Web UI            | `pnpm --filter @climbing-coach/web dev`                           |
-| API server        | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` |
+| Web UI            | `VITE_COACH_TOKEN=dev-token pnpm --filter @climbing-coach/web dev` |
+| API server        | `COACH_TOKEN=dev-token pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` |
 | Schema only       | `pnpm --filter @climbing-coach/schema test`                       |
 | Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                    |
 
@@ -95,14 +95,12 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## What exists today vs later
 
-**In tree now:** monorepo scaffolding (P0.1), schema **v1.0.0**, synthetic `coach eval`
-(P0.7), label-tool stub (P0.4), capture protocol (P0.3 docs), proposed ADR-001 / ADR-002.
-Phase 1 pure engine (P1.1–P1.6) at `engine` 0.1.0: activity, pose preprocess, frame features
-(`FEATURE_SPEC` 0.1.0), attempt detection, review-draft cut ops, moves, alignment. Synthetic
-climber fixtures (P1.9, no fixture videos). CLI `detect` / `align` / `cut --draft` / `bench`
-(P1.10). `coach process` and video `cut` exit 2 until ffmpeg exists.
+**In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), and
+Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell + homepage
+training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades` are
+pure. Health is `degraded` until ffmpeg and the pose runtime ship.
 
-**Blocked / not built yet:** real dataset media (P0.3, P1.11 tuning), pose bake-off and the
-pose adapter (P0.5–P0.6, P1.8), shipped ffmpeg and video tools (P0.8, P1.7), ingest/review UI,
-Electron packaging, comparison UI, mobile. Implement those only when the matching phase item
-says so and prerequisites exist.
+**Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off / adapter
+(P0.5–P0.6, P1.8), shipped ffmpeg and video tools (P0.8, P1.7), ingest/review (P2-B),
+library/player/rating (P2-C), Electron packaging (P2-D), comparison, mobile. Implement those
+only when the matching phase item says so and prerequisites exist.
