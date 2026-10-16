@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS review_items (
   detected_climb_start_us INTEGER,
   detected_climb_end_us INTEGER,
   detected_outcome TEXT,
-  confidence INTEGER,
+  confidence REAL,
   derived_from_json TEXT NOT NULL DEFAULT '[]',
   climb_start_us INTEGER NOT NULL,
   climb_end_us INTEGER NOT NULL,
@@ -178,8 +178,10 @@ CREATE INDEX IF NOT EXISTS tags_deleted_at ON tags(deleted_at);
 
 CREATE TABLE IF NOT EXISTS attempt_tags (
   attempt_id TEXT NOT NULL,
-  tag_id TEXT NOT NULL
-);
+  tag_id TEXT NOT NULL,
+  PRIMARY KEY (attempt_id, tag_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS attempt_tags_tag_id ON attempt_tags(tag_id);
 
 CREATE TABLE IF NOT EXISTS move_segments (
   id TEXT PRIMARY KEY,
@@ -190,8 +192,8 @@ CREATE TABLE IF NOT EXISTS move_segments (
   limb TEXT NOT NULL,
   start_us INTEGER NOT NULL,
   end_us INTEGER NOT NULL,
-  hold_x INTEGER,
-  hold_y INTEGER,
+  hold_x REAL,
+  hold_y REAL,
   version INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -248,16 +250,18 @@ CREATE INDEX IF NOT EXISTS focus_tags_deleted_at ON focus_tags(deleted_at);
 
 CREATE TABLE IF NOT EXISTS training_log_focus (
   date TEXT NOT NULL,
-  focus_id TEXT NOT NULL
-);
+  focus_id TEXT NOT NULL,
+  PRIMARY KEY (date, focus_id)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS training_log_grades (
   date TEXT NOT NULL,
   discipline TEXT NOT NULL,
   grade TEXT NOT NULL,
   attempted INTEGER NOT NULL DEFAULT 0,
-  sent INTEGER NOT NULL DEFAULT 0
-);
+  sent INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (date, discipline, grade)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS labels (
   id TEXT PRIMARY KEY,

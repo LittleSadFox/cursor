@@ -1,8 +1,19 @@
 export { createCoreApi, type CoreDeps } from './create-api.js';
-export { applyMigrations, appliedMigrationIds } from './db/migrate.js';
-export { MIGRATIONS } from './db/migrations.js';
+export {
+  applyMigrations,
+  appliedMigrationIds,
+  pendingMigrations,
+  type MigrateOptions,
+} from './db/migrate.js';
+export { MIGRATIONS, type Migration } from './db/migrations.js';
 export * as dbSchema from './db/schema.js';
-export { createIdGen, encodeUlid, sequentialRandomBytes, type IdGen, type RandomBytes } from './ids/ulid.js';
+export {
+  createIdGen,
+  encodeUlid,
+  sequentialRandomBytes,
+  type IdGen,
+  type RandomBytes,
+} from './ids/ulid.js';
 export { createJobRunner, type JobRunner } from './jobs/runner.js';
 export { P2A_PIPELINES } from './jobs/pipelines.js';
 export { isSyncFolder } from './library/sync-folder.js';

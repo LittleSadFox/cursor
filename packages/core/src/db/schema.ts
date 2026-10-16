@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 const timestamps = {
   createdAt: text('created_at').notNull(),
@@ -115,7 +115,10 @@ export const poseTracks = sqliteTable(
     version: integer('version').notNull().default(1),
     ...timestamps,
   },
-  (t) => [index('pose_tracks_video_id').on(t.videoId), index('pose_tracks_deleted_at').on(t.deletedAt)],
+  (t) => [
+    index('pose_tracks_video_id').on(t.videoId),
+    index('pose_tracks_deleted_at').on(t.deletedAt),
+  ],
 );
 
 export const reviewItems = sqliteTable(
@@ -128,7 +131,7 @@ export const reviewItems = sqliteTable(
     detectedClimbStartUs: integer('detected_climb_start_us'),
     detectedClimbEndUs: integer('detected_climb_end_us'),
     detectedOutcome: text('detected_outcome'),
-    confidence: integer('confidence'),
+    confidence: real('confidence'),
     derivedFromJson: text('derived_from_json').notNull().default('[]'),
     climbStartUs: integer('climb_start_us').notNull(),
     climbEndUs: integer('climb_end_us').notNull(),
@@ -191,10 +194,17 @@ export const tags = sqliteTable(
   (t) => [index('tags_deleted_at').on(t.deletedAt)],
 );
 
-export const attemptTags = sqliteTable('attempt_tags', {
-  attemptId: text('attempt_id').notNull(),
-  tagId: text('tag_id').notNull(),
-});
+export const attemptTags = sqliteTable(
+  'attempt_tags',
+  {
+    attemptId: text('attempt_id').notNull(),
+    tagId: text('tag_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.attemptId, t.tagId] }),
+    index('attempt_tags_tag_id').on(t.tagId),
+  ],
+);
 
 export const moveSegments = sqliteTable(
   'move_segments',
@@ -207,12 +217,15 @@ export const moveSegments = sqliteTable(
     limb: text('limb').notNull(),
     startUs: integer('start_us').notNull(),
     endUs: integer('end_us').notNull(),
-    holdX: integer('hold_x'),
-    holdY: integer('hold_y'),
+    holdX: real('hold_x'),
+    holdY: real('hold_y'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },
-  (t) => [index('move_segments_attempt_id').on(t.attemptId), index('move_segments_deleted_at').on(t.deletedAt)],
+  (t) => [
+    index('move_segments_attempt_id').on(t.attemptId),
+    index('move_segments_deleted_at').on(t.deletedAt),
+  ],
 );
 
 export const comparisons = sqliteTable(
@@ -264,18 +277,26 @@ export const focusTags = sqliteTable(
   (t) => [index('focus_tags_deleted_at').on(t.deletedAt)],
 );
 
-export const trainingLogFocus = sqliteTable('training_log_focus', {
-  date: text('date').notNull(),
-  focusId: text('focus_id').notNull(),
-});
+export const trainingLogFocus = sqliteTable(
+  'training_log_focus',
+  {
+    date: text('date').notNull(),
+    focusId: text('focus_id').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.date, t.focusId] })],
+);
 
-export const trainingLogGrades = sqliteTable('training_log_grades', {
-  date: text('date').notNull(),
-  discipline: text('discipline').notNull(),
-  grade: text('grade').notNull(),
-  attempted: integer('attempted').notNull().default(0),
-  sent: integer('sent').notNull().default(0),
-});
+export const trainingLogGrades = sqliteTable(
+  'training_log_grades',
+  {
+    date: text('date').notNull(),
+    discipline: text('discipline').notNull(),
+    grade: text('grade').notNull(),
+    attempted: integer('attempted').notNull().default(0),
+    sent: integer('sent').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.date, t.discipline, t.grade] })],
+);
 
 export const labels = sqliteTable(
   'labels',

@@ -15,7 +15,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "migrations:embed": "node scripts/embed-migrations.mjs"
   },
   "dependencies": {
     "@climbing-coach/api": "workspace:*",
