@@ -114,7 +114,8 @@ describe('coach commands', () => {
     expect(capture(['compare', '--a', poses]).exitCode).toBe(1);
   });
 
-  it('reports engine timings against the BUILD_PLAN budgets', () => {
+  // `bench` times full-size workloads (warm-up + 3 runs each); CI runners need well over 5 s.
+  it('reports engine timings against the BUILD_PLAN budgets', { timeout: 30_000 }, () => {
     const { out } = capture(['bench']);
     const body = JSON.parse(out[0] ?? '{}') as {
       results: { name: string; ms: number; budgetMs: number | null }[];
