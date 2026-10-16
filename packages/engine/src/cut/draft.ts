@@ -47,7 +47,7 @@ export function splitItem(
     touched: true,
     rejected: false as const,
     source: 'split' as const,
-    parentIds: [item.id],
+    parentIds: item.parentIds,
   };
   return [
     { ...base, id: ids.left, climb: { startUs: item.climb.startUs, endUs: atUs } },
@@ -55,20 +55,23 @@ export function splitItem(
   ];
 }
 
+/** Merged climb spans both items. Its outcome is the later item's, whatever the argument order. */
 export function mergeItems(left: DraftItem, right: DraftItem, id: string): DraftItem {
   if (rangesOverlap(left.climb, right.climb)) {
     throw new Error('mergeItems: climb ranges overlap');
   }
-  const startUs = Math.min(left.climb.startUs, right.climb.startUs);
-  const endUs = Math.max(left.climb.endUs, right.climb.endUs);
+  const later = right.climb.endUs >= left.climb.endUs ? right : left;
   return {
     id,
-    climb: { startUs, endUs },
-    outcome: right.outcome,
+    climb: {
+      startUs: Math.min(left.climb.startUs, right.climb.startUs),
+      endUs: Math.max(left.climb.endUs, right.climb.endUs),
+    },
+    outcome: later.outcome,
     touched: true,
     rejected: false,
     source: 'merge',
-    parentIds: [left.id, right.id],
+    parentIds: [...new Set([...left.parentIds, ...right.parentIds])],
   };
 }
 

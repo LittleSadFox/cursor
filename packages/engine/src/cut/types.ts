@@ -12,7 +12,10 @@ export type DraftItem = {
   touched: boolean;
   rejected: boolean;
   source: DraftSource;
-  /** Detector item ids this row came from. Empty for a fresh manual add. */
+  /**
+   * Detector item ids this row descends from, through any number of splits and merges.
+   * A detector row lists its own id. Empty for a manual add.
+   */
   parentIds: readonly string[];
 };
 
