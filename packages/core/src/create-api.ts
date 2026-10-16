@@ -6,12 +6,16 @@ import type { IdGen } from './ids/ulid.js';
 import { compareHandlers } from './jobs/compare-handlers.js';
 import { maintenanceHandlers } from './jobs/handlers.js';
 import { CORE_PIPELINES } from './jobs/pipelines.js';
+import { recordingHandlers } from './jobs/recording-handlers.js';
 import { createJobRunner, type JobRunner } from './jobs/runner.js';
 import type { BlobStore } from './ports/blobs.js';
 import type { Clock } from './ports/clock.js';
 import type { EventBus } from './ports/events.js';
 import type { Logger } from './ports/logger.js';
+import type { MediaFiles } from './ports/media-files.js';
 import type { AppDatabase, SqlExecutor, SqliteBackup } from './ports/sql.js';
+import type { VideoTools } from './ports/video.js';
+import { createRecordingService } from './recordings/service.js';
 import { createCatalogService } from './services/catalog.js';
 import { createComparisonService } from './services/comparisons.js';
 import { createStatsService } from './services/stats.js';
@@ -34,16 +38,23 @@ export type CoreDeps = {
   ffmpegVersion?: string | null;
   ffmpegNote?: string;
   poseAvailable?: boolean;
+  video?: VideoTools | undefined;
+  mediaFiles?: MediaFiles | undefined;
+  mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
   cpuCores?: number;
   onLibraryRootChange?: (root: string | null) => void;
 };
 
 /** Composes the core services into the CoachApi (BUILD_PLAN §3.2). Requeues orphaned job steps on start. */
-export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunner } {
+export function createCoreApi(deps: CoreDeps): CoachApi & {
+  jobsRunner: JobRunner;
+  resolveMedia: ReturnType<typeof createRecordingService>['mediaFile'];
+} {
   const { db, clock } = deps;
   seedFocusTags(db, clock);
 
   const trash = createTrashService(db, clock, () => readSettings(db).trashRetentionDays);
+  const canProcess = deps.video?.ready() === true && deps.mediaFiles !== undefined;
   const jobsRunner = createJobRunner({
     db,
     clock,
@@ -53,11 +64,29 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
     handlers: {
       ...maintenanceHandlers({ backup: deps.backup, trash }),
       ...compareHandlers({ db, clock, events: deps.events, blobs: deps.blobs }),
+      ...(canProcess && deps.video && deps.mediaFiles
+        ? recordingHandlers({
+            db,
+            clock,
+            video: deps.video,
+            files: deps.mediaFiles,
+          })
+        : {}),
     },
     cpuCores: deps.cpuCores,
   });
   const recovered = jobsRunner.recover();
   if (recovered > 0) deps.logger.warn({ recovered }, 'requeued job steps interrupted by a restart');
+
+  const recordings = createRecordingService({
+    db,
+    clock,
+    ids: deps.ids,
+    runner: jobsRunner,
+    video: deps.video,
+    files: deps.mediaFiles,
+    mediaUrl: deps.mediaUrl,
+  });
 
   return {
     system: createSystemService({
@@ -74,6 +103,7 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
     stats: createStatsService(db),
     trash,
     videos: createVideoService({ db, blobs: deps.blobs }),
+    recordings,
     comparisons: createComparisonService({
       db,
       clock,
@@ -90,5 +120,6 @@ export function createCoreApi(deps: CoreDeps): CoachApi & { jobsRunner: JobRunne
     },
     events: { subscribe: (handler) => deps.events.subscribe(handler) },
     jobsRunner,
+    resolveMedia: recordings.mediaFile,
   };
 }

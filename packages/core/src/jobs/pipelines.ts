@@ -21,6 +21,31 @@ export const COMPARE_PIPELINE: Pipeline = {
   ],
 };
 
+export const IMPORT_PIPELINE: Pipeline = {
+  type: 'import-recording',
+  steps: [
+    { name: 'place', resource: 'ffmpeg', dependsOn: [] },
+    { name: 'quick-hash', resource: 'compute', dependsOn: ['place'] },
+    { name: 'probe', resource: 'ffmpeg', dependsOn: ['quick-hash'] },
+    { name: 'proxy', resource: 'ffmpeg', dependsOn: ['probe'] },
+    { name: 'full-hash', resource: 'idle', dependsOn: ['place'] },
+  ],
+};
+
+export const CUT_PIPELINE: Pipeline = {
+  type: 'cut-recording',
+  steps: [
+    { name: 'cut', resource: 'ffmpeg', dependsOn: [] },
+    { name: 'probe', resource: 'ffmpeg', dependsOn: ['cut'] },
+    { name: 'proxy', resource: 'ffmpeg', dependsOn: ['probe'] },
+  ],
+};
+
 export const P2A_PIPELINES: readonly Pipeline[] = [BACKUP_PIPELINE, PURGE_PIPELINE];
 
-export const CORE_PIPELINES: readonly Pipeline[] = [...P2A_PIPELINES, COMPARE_PIPELINE];
+export const CORE_PIPELINES: readonly Pipeline[] = [
+  ...P2A_PIPELINES,
+  COMPARE_PIPELINE,
+  IMPORT_PIPELINE,
+  CUT_PIPELINE,
+];

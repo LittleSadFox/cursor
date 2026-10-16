@@ -4,13 +4,16 @@ import { API_VERSION } from '@climbing-coach/api';
 import {
   appConfigDir,
   backupsDir,
+  createNodeVideoTools,
   defaultLibraryRoot,
   libraryBlobs,
   libraryDbPath,
+  libraryMediaFiles,
   nodeRandomBytes,
   openSqliteLibrary,
   probeFfmpegStatus,
   readLibraryPointer,
+  signMedia,
   writeLibraryPointer,
 } from '@climbing-coach/adapters-node';
 import {
@@ -49,6 +52,10 @@ async function main(): Promise<void> {
   let persistLibraryRoot = false;
   const events = createEventBus(() => clock.nowMs());
   const ffmpeg = probeFfmpegStatus();
+  const video = createNodeVideoTools();
+  const mediaFiles = libraryMediaFiles(libraryRoot);
+  const mediaUrl = (videoId: string, variant: 'original' | 'proxy') =>
+    `/api/v1/media/videos/${videoId}?variant=${variant}&sig=${signMedia(config.mediaSecret, videoId, variant)}`;
   const api = createCoreApi({
     db: opened.db,
     sql: opened.sql,
@@ -62,6 +69,9 @@ async function main(): Promise<void> {
     ffmpegVersion: ffmpeg.version,
     ffmpegNote: ffmpeg.note,
     poseAvailable: false,
+    video,
+    mediaFiles,
+    mediaUrl,
     onLibraryRootChange: (root) => {
       if (persistLibraryRoot) writeLibraryPointer(configDir, root);
     },
@@ -80,6 +90,7 @@ async function main(): Promise<void> {
     allowedOrigins: config.allowedOrigins,
     mediaSecret: config.mediaSecret,
     libraryRoot,
+    resolveMedia: api.resolveMedia,
     logger: true,
   });
   const stopScheduler = startScheduler(api.jobsRunner, consoleLogger);

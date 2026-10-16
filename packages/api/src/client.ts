@@ -5,6 +5,12 @@ import { ComparisonSchema, type Comparison } from './comparisons.js';
 import type { Gym, GymInput, GymPatch } from './gyms.js';
 import { HealthResponseSchema } from './health.js';
 import type { Job, JobQuery } from './jobs.js';
+import {
+  RecordingSchema,
+  type RecordingAccepted,
+  type RecordingCut,
+  type RecordingImport,
+} from './recordings.js';
 import { isProblem, ProblemError, type Problem, type ProblemCode } from './problems.js';
 import type { Session, SessionInput, SessionPatch } from './sessions.js';
 import { SettingsSchema, type Settings, type SettingsPatch } from './settings.js';
@@ -145,6 +151,17 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
     videos: {
       pose: (id, q) =>
         requestBytes(`/videos/${id}/pose`, q as Record<string, string | number | undefined>),
+    },
+    recordings: {
+      list: async () => {
+        const rows = await request<unknown[]>('GET', '/recordings');
+        return rows.map((row) => RecordingSchema.parse(row));
+      },
+      get: async (id) => RecordingSchema.parse(await request('GET', `/recordings/${id}`)),
+      importPath: (input: RecordingImport) =>
+        request<RecordingAccepted>('POST', '/recordings', input),
+      cut: (id, input: RecordingCut) =>
+        request<RecordingAccepted>('POST', `/recordings/${id}/cut`, input),
     },
     comparisons: {
       create: (input) => comparison('POST', '/comparisons', input),

@@ -5,6 +5,7 @@ import type { EventBus } from '@climbing-coach/core';
 
 import { registerErrorHandler } from './errors.js';
 import { registerRoutes } from './routes/index.js';
+import { type MediaOptions } from './routes/media.js';
 import { registerSecurity } from './security.js';
 import { registerEvents } from './sse.js';
 
@@ -15,6 +16,7 @@ export type CreateAppOptions = {
   allowedOrigins: readonly string[];
   mediaSecret: string;
   libraryRoot: string | null;
+  resolveMedia?: MediaOptions['resolveMedia'];
   logger?: boolean;
   heartbeatMs?: number;
 };
@@ -25,7 +27,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerSecurity(app, { token: options.token, allowedOrigins: options.allowedOrigins });
   registerRoutes(app, options.api, {
     mediaSecret: options.mediaSecret,
-    libraryRoot: options.libraryRoot,
+    resolveMedia: options.resolveMedia,
   });
   registerEvents(app, {
     events: options.events,

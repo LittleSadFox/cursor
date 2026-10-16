@@ -11,4 +11,8 @@ export const MIGRATIONS: readonly Migration[] = [
     id: '0002_comparisons',
     sql: "ALTER TABLE comparisons ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';\nALTER TABLE comparisons ADD COLUMN job_id TEXT;\nALTER TABLE comparisons ADD COLUMN error TEXT;\nALTER TABLE comparisons ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}';\nALTER TABLE comparisons ADD COLUMN sides_json TEXT NOT NULL DEFAULT '{}';\n\nCREATE UNIQUE INDEX IF NOT EXISTS comparisons_cache_key\n  ON comparisons(attempt_a_id, attempt_b_id, pose_model, engine_version, options_hash)\n  WHERE deleted_at IS NULL;\nCREATE INDEX IF NOT EXISTS labels_subject_id ON labels(subject_id);\n",
   },
+  {
+    id: '0003_video',
+    sql: "ALTER TABLE videos ADD COLUMN file_name TEXT NOT NULL DEFAULT '';\nALTER TABLE videos ADD COLUMN frame_count INTEGER;\nALTER TABLE videos ADD COLUMN avg_fps_milli INTEGER;\nALTER TABLE videos ADD COLUMN color_transfer TEXT;\nALTER TABLE videos ADD COLUMN dv_profile TEXT;\nALTER TABLE videos ADD COLUMN import_job_id TEXT;\n",
+  },
 ];

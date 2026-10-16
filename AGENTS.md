@@ -98,18 +98,21 @@ schema smoke + LGPL ffmpeg build/verify). PR checklist: `.github/PULL_REQUEST_TE
 
 ## What exists today vs later
 
-**In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), and
+**In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), P1.7 video
+tools (probe, quick/full hash, frame source, H.264 proxy, lossless/reencode/auto cut,
+thumbnail/filmstrip/loupe) behind a core `VideoTools` port, and the smallest recordings import
+on `/recordings` (upload or absolute path, persisted row, probe metadata, proxy playback, cut).
 Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell + homepage
 training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades` are
-pure. Health is `degraded` until the pose runtime ships; the P0.8 locator reports
-bundled/env ffmpeg only (Linux PATH is a non-shipping fallback). Phase 3 (P3.1–P3.5):
+pure. Health stays `degraded` until the pose runtime ships; the P0.8 locator reports
+bundled/env ffmpeg only (Linux PATH can run tools but `ffmpeg.available` stays false). Phase 3 (P3.1–P3.5):
 `engine/compare` posture deltas + per-move text, `compare` job pipeline with a cached
 `comparisons` table (migration 0002), `/comparisons` + `/videos/:id/pose` routes, and the web
 `/compare` view (playback controller, skeleton/ghost renderer, divergence timeline, move panel,
 alignment feedback labels).
 
 **Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off / adapter
-(P0.5–P0.6, P1.8), P1.7 video tools (P0.8 locator is in tree; ADR-002 still Proposed), ingest/review (P2-B),
-library/player/rating (P2-C), Electron packaging (P2-D), comparison video playback and
-export (P3.6, ADR-002), wall-relative ghost alignment, mobile. Implement those only when the
-matching phase item says so and prerequisites exist.
+(P0.5–P0.6, P1.8), Apple signing (ADR-002 stays Proposed), the rest of ingest/review (P2-B:
+activity, pose, proposals, filmstrip/loupe UI), library/player/rating (P2-C), Electron packaging
+(P2-D), comparison video playback and export (P3.6), wall-relative ghost alignment, mobile.
+Implement those only when the matching phase item says so and prerequisites exist.

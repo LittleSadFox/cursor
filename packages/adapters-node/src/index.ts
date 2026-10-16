@@ -1,6 +1,6 @@
 /**
  * Node/desktop port implementations (BUILD_PLAN §2).
- * Pose runtime still waits on ADR-001. ffmpeg locator is P0.8; video tools are P1.7.
+ * Pose runtime still waits on ADR-001. Video tools are P1.7 (`video/`).
  */
 export const ADAPTERS_NODE_VERSION = '0.0.0';
 
@@ -45,5 +45,7 @@ export {
   resolveUnderRoot,
   writeLibraryPointer,
 } from './paths.js';
+export { createNodeVideoTools, assertSafeOutputArgs } from './video/tools.js';
+export { libraryMediaFiles } from './media-files.js';
 export { nodeRandomBytes } from './random.js';
 export { libraryBlobs } from './blobs.js';

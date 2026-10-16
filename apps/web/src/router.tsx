@@ -5,6 +5,7 @@ import { ComparePage } from './pages/compare/compare.js';
 import { compareSearch } from './pages/compare/search.js';
 import { HomePage } from './pages/home.js';
 import { PlaceholderPage } from './pages/placeholder.js';
+import { RecordingsPage } from './pages/recordings.js';
 import { SettingsPage } from './pages/settings.js';
 import { SetupPage } from './pages/setup.js';
 import { TrashPage } from './pages/trash.js';
@@ -51,7 +52,7 @@ const libraryRoute = createRoute({
 const recordingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/recordings',
-  component: () => <PlaceholderPage messageId="placeholder.recordings" />,
+  component: RecordingsPage,
 });
 
 const compareRoute = createRoute({

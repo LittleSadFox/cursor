@@ -77,7 +77,7 @@ describe('0002 comparisons', () => {
         options_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       ['c1', 'a', 'b', 'm@1', '0.1.0', 'h', NOW, NOW],
     );
-    expect(applyMigrations(exec, NOW)).toEqual(['0002_comparisons']);
+    expect(applyMigrations(exec, NOW)).toEqual(['0002_comparisons', '0003_video']);
     expect(exec.get('SELECT status, job_id, options_json FROM comparisons')).toEqual({
       status: 'pending',
       job_id: null,

@@ -150,6 +150,21 @@ export {
   type SpatialMode,
   type VideoPoseQuery,
 } from './comparisons.js';
+export {
+  CutModeSchema,
+  ImportModeSchema,
+  MediaVariantSchema,
+  RecordingCutSchema,
+  RecordingImportSchema,
+  RecordingSchema,
+  type CutMode,
+  type MediaFile,
+  type MediaVariant,
+  type Recording,
+  type RecordingAccepted,
+  type RecordingCut,
+  type RecordingImport,
+} from './recordings.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
 export type { CoachApi, Crud } from './coach-api.js';
 export {

@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { SettingsPatch, TrainingLogInput, TrashKind } from '@climbing-coach/api';
+import type {
+  CutMode,
+  RecordingImport,
+  SettingsPatch,
+  TrainingLogInput,
+  TrashKind,
+} from '@climbing-coach/api';
 
 import { api } from '../api.js';
 import { isoWeekOf, localDate, rangeFrom, type RangeKey } from '../dates.js';
@@ -70,6 +76,44 @@ export function useSaveSettings() {
     mutationFn: (patch: SettingsPatch) => api.system.updateSettings(patch),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+}
+
+export function useRecordings() {
+  return useQuery({
+    queryKey: ['recordings'],
+    queryFn: () => api.recordings.list(),
+    refetchInterval: (query) => {
+      const busy = (query.state.data ?? []).some(
+        (row) => row.jobStatus === 'queued' || row.jobStatus === 'running',
+      );
+      return busy ? 1500 : false;
+    },
+  });
+}
+
+export function useImportPath() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RecordingImport) => api.recordings.importPath(input),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['recordings'] });
+    },
+  });
+}
+
+export function useCutRecording() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; startUs: number; endUs: number; mode: CutMode }) =>
+      api.recordings.cut(input.id, {
+        startUs: input.startUs,
+        endUs: input.endUs,
+        mode: input.mode,
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['recordings'] });
     },
   });
 }
