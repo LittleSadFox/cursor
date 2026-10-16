@@ -240,6 +240,12 @@ button:disabled {
   gap: 1rem;
 }
 
+/* Two columns even for landscape clips; each canvas shrinks to its column, keeping its aspect. */
+.players.side-by-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+}
+
 .pose-canvas {
   background: #0b1411;
   border: 1px solid #2a4a3f;

@@ -5,7 +5,7 @@ import type { MoveSpan } from '../../hooks/compare/moves.js';
 
 import { divergencePath, positionAtX, xOfPosition } from './divergence-path.js';
 
-const BOX = { width: 720, height: 90 };
+const BOX = { width: 720, height: 90, pad: 4 };
 
 export type DivergenceTimelineProps = {
   scores: Float32Array;

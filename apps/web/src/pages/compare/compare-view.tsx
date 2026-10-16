@@ -93,7 +93,7 @@ function ComparisonPlayer({ comparison, data, poses }: PlayerProps) {
           onOpacity={setOpacity}
         />
       </div>
-      <div className="players">
+      <div className={layout === 'side_by_side' ? 'players side-by-side' : 'players'}>
         {layout === 'side_by_side' ? (
           <>
             <PoseCanvas
