@@ -8,8 +8,8 @@ import { highlightedJoints, scoreSeries } from '../../hooks/compare/divergence.j
 import { moveAt, moveSpans, moveViews } from '../../hooks/compare/moves.js';
 import {
   durationOf,
-  positionForA,
   positionsAt,
+  resumePosition,
   stepPositions,
   type SyncMode,
 } from '../../hooks/compare/timeline.js';
@@ -75,12 +75,11 @@ function ComparisonPlayer({ comparison, data, poses }: PlayerProps) {
   );
 
   const switchMode = (next: SyncMode) => {
-    const resumeAt =
-      next === 'synced'
-        ? positionForA(data.timeline, positions.tA)
-        : Math.max(0, positions.tA - climbs.a.startUs);
     setMode(next);
-    seek(resumeAt);
+    seek(
+      resumePosition(data.timeline, next, climbs.a, positions.tA),
+      durationOf(data.timeline, next, climbs),
+    );
   };
 
   return (

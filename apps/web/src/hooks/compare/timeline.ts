@@ -104,18 +104,30 @@ export function realTimeDuration(a: ClimbRange, b: ClimbRange): number {
   return Math.max(a.endUs - a.startUs, b.endUs - b.startUs);
 }
 
-/** Warp step whose A time is closest to `tA`; the first such step when A holds. */
+/** First index whose value is ≥ `value` in a non-decreasing array. */
+function lowerBound(values: Float64Array, value: number): number {
+  let lo = 0;
+  let hi = values.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if ((values[mid] ?? 0) < value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * Warp step whose A time is closest to `tA`; the first such step when A holds. A's warp times
+ * never decrease, so this is a binary search (it runs every frame in real-time mode).
+ */
 export function stepForA(timeline: Timeline, tA: number): number {
-  let best = -1;
-  let bestGap = Number.POSITIVE_INFINITY;
-  timeline.a.forEach((value, index) => {
-    const gap = Math.abs(value - tA);
-    if (gap < bestGap) {
-      bestGap = gap;
-      best = index;
-    }
-  });
-  return best;
+  const { a } = timeline;
+  if (a.length === 0 || Number.isNaN(tA)) return -1;
+  const above = lowerBound(a, tA);
+  if (above === 0) return 0;
+  const below = a[above - 1] ?? 0;
+  if (above === a.length || tA - below <= (a[above] ?? 0) - tA) return lowerBound(a, below);
+  return above;
 }
 
 /** Movement-synced position of the step closest to A's time `tA` (to resume after a mode switch). */
@@ -148,6 +160,16 @@ export function positionsAt(
   if (mode === 'synced') return syncedPositions(timeline, position);
   const positions = realTimePositions(climbs.a, climbs.b, position);
   return { ...positions, step: stepForA(timeline, positions.tA) };
+}
+
+/** Position in mode `next` that keeps A on the frame it shows now at A time `tA`. */
+export function resumePosition(
+  timeline: Timeline,
+  next: SyncMode,
+  climbA: ClimbRange,
+  tA: number,
+): number {
+  return next === 'synced' ? positionForA(timeline, tA) : Math.max(0, tA - climbA.startUs);
 }
 
 export function durationOf(

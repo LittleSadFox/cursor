@@ -8,6 +8,7 @@ import {
   positionForStep,
   positionsAt,
   realTimePositions,
+  resumePosition,
   stepAt,
   stepForA,
   stepPositions,
@@ -114,5 +115,35 @@ describe('mode switches and seeking', () => {
     expect(positionForStep(timeline, 2, 'synced', climbA)).toBe(3 * S);
     expect(positionForStep(timeline, 3, 'realtime', climbA)).toBe(2 * S);
     expect(stepPositions(timeline, 'realtime', climbA)).toEqual([0, S, S, 2 * S, 2.5 * S]);
+  });
+
+  it('finds the nearest A step by binary search, preferring the first of equal steps', () => {
+    expect(stepForA(timeline, -5 * S)).toBe(0);
+    expect(stepForA(timeline, 1.4 * S)).toBe(1);
+    expect(stepForA(timeline, 1.5 * S)).toBe(1);
+    expect(stepForA(timeline, 1.6 * S)).toBe(3);
+    expect(stepForA(timeline, 9 * S)).toBe(4);
+    expect(stepForA(buildTimeline(new Int32Array()), 0)).toBe(-1);
+    const nearestByScan = (tA: number) => {
+      let best = -1;
+      timeline.a.forEach((value, index) => {
+        if (best < 0 || Math.abs(value - tA) < Math.abs((timeline.a[best] ?? 0) - tA)) best = index;
+      });
+      return best;
+    };
+    for (let tA = -S; tA <= 3 * S; tA += S / 8) {
+      expect(stepForA(timeline, tA)).toBe(nearestByScan(tA));
+    }
+  });
+
+  it('keeps A on the same frame across a mode switch at warp steps', () => {
+    const climbs = { a: { startUs: 0, endUs: 2.5 * S }, b: { startUs: 0, endUs: 4.5 * S } };
+    for (const position of [0, S, 2 * S, 3 * S, 4 * S, 4.5 * S]) {
+      const { tA } = positionsAt(timeline, 'synced', climbs, position);
+      const realtime = resumePosition(timeline, 'realtime', climbA, tA);
+      expect(positionsAt(timeline, 'realtime', climbs, realtime).tA).toBe(tA);
+      const back = resumePosition(timeline, 'synced', climbA, tA);
+      expect(positionsAt(timeline, 'synced', climbs, back).tA).toBe(tA);
+    }
   });
 });

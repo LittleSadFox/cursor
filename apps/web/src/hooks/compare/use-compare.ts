@@ -115,8 +115,10 @@ export function usePlaybackClock(durationUs: number) {
 
   const play = useCallback(() => setClock((state) => startClock(state, durationUs)), [durationUs]);
   const pause = useCallback(() => setClock((state) => ({ ...state, playing: false })), []);
+  /** `limitUs` overrides the duration when the seek also switches to a timeline of another length. */
   const seek = useCallback(
-    (position: number) => setClock((state) => seekClock(state, position, durationUs)),
+    (position: number, limitUs = durationUs) =>
+      setClock((state) => seekClock(state, position, limitUs)),
     [durationUs],
   );
   return { clock, play, pause, seek };
