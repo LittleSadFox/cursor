@@ -9,9 +9,10 @@ propose auto-cuts, rate proximity + exertion, store a library, and later compare
 follow. Windows/Linux/Intel Mac are out of scope for v1.
 
 Do not invent a greenfield product. Follow the plans; if ambiguous, pick the clearest path,
-note the assumption in the PR, and keep building. Phase 0, Phase 1 engine, and Phase 2-A
-(backend, shell, homepage) are in tree. Next unblocked work is more 2-A polish; ingest
-(P2-B) waits on a dataset, ADR-001, and macOS ffmpeg.
+note the assumption in the PR, and keep building. Phase 0, Phase 1 engine, Phase 2-A
+(backend, shell, homepage), and the Phase 3 comparison pipeline + skeleton compare view are
+in tree. Ingest (P2-B), video playback, and comparison export wait on a dataset, ADR-001,
+and macOS ffmpeg (ADR-002).
 
 ## Plans and decisions
 
@@ -98,9 +99,14 @@ schema smoke). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 **In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), and
 Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell + homepage
 training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades` are
-pure. Health is `degraded` until ffmpeg and the pose runtime ship.
+pure. Health is `degraded` until ffmpeg and the pose runtime ship. Phase 3 (P3.1–P3.5):
+`engine/compare` posture deltas + per-move text, `compare` job pipeline with a cached
+`comparisons` table (migration 0002), `/comparisons` + `/videos/:id/pose` routes, and the web
+`/compare` view (playback controller, skeleton/ghost renderer, divergence timeline, move panel,
+alignment feedback labels).
 
 **Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off / adapter
 (P0.5–P0.6, P1.8), shipped ffmpeg and video tools (P0.8, P1.7), ingest/review (P2-B),
-library/player/rating (P2-C), Electron packaging (P2-D), comparison, mobile. Implement those
-only when the matching phase item says so and prerequisites exist.
+library/player/rating (P2-C), Electron packaging (P2-D), comparison video playback and
+export (P3.6, ADR-002), wall-relative ghost alignment, mobile. Implement those only when the
+matching phase item says so and prerequisites exist.
