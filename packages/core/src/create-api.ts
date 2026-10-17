@@ -77,6 +77,7 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
             pose: deps.pose,
             blobs: deps.blobs,
             ids: deps.ids,
+            events: deps.events,
           })
         : {}),
     },

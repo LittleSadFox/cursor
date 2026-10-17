@@ -5,11 +5,15 @@ import {
   type RecordingAccepted,
   type RecordingCut,
   type RecordingImport,
+  type ReviewItem,
 } from '@climbing-coach/api';
+import { AttemptOutcomeSchema } from '@climbing-coach/schema';
 
 import { findPoseTrack } from '../db/repos/attempts.js';
 import { getJob } from '../db/repos/jobs.js';
+import { listReviewItems } from '../db/repos/review.js';
 import { getVideo, insertVideo, listVideos, updateVideo } from '../db/repos/videos.js';
+import { parseWarningList } from '../ingest/warnings.js';
 import type { IdGen } from '../ids/ulid.js';
 import type { JobRunner } from '../jobs/runner.js';
 import type { Clock } from '../ports/clock.js';
@@ -28,6 +32,49 @@ export type RecordingDeps = {
   files?: MediaFiles | undefined;
   mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
 };
+
+function clipBounds(
+  climbStartUs: number,
+  climbEndUs: number,
+  prePadUs: number,
+  postPadUs: number,
+  durationUs: number,
+): { clipStartUs: number; clipEndUs: number } {
+  const videoEnd = durationUs > 0 ? durationUs : climbEndUs + postPadUs;
+  const clipStartUs = Math.max(0, climbStartUs - prePadUs);
+  const clipEndUs = Math.min(videoEnd, climbEndUs + postPadUs);
+  return { clipStartUs, clipEndUs: Math.max(clipStartUs, clipEndUs) };
+}
+
+function toReviewItem(
+  row: ReturnType<typeof listReviewItems>[number],
+  durationUs: number,
+): ReviewItem | null {
+  const outcome = AttemptOutcomeSchema.safeParse(row.outcome);
+  const status =
+    row.status === 'committed' || row.status === 'rejected' || row.status === 'draft'
+      ? row.status
+      : null;
+  if (!outcome.success || !status) return null;
+  const clip = clipBounds(
+    row.climbStartUs,
+    row.climbEndUs,
+    row.prePadUs,
+    row.postPadUs,
+    durationUs,
+  );
+  return {
+    id: row.id,
+    videoId: row.videoId,
+    outcome: outcome.data,
+    climbStartUs: row.climbStartUs,
+    climbEndUs: row.climbEndUs,
+    clipStartUs: clip.clipStartUs,
+    clipEndUs: clip.clipEndUs,
+    confidence: row.confidence,
+    status,
+  };
+}
 
 function jobOf(db: AppDatabase, id: string | null): Job | null {
   if (!id) return null;
@@ -71,6 +118,7 @@ function toRecording(
       row.reviewState === 'in_review' || row.reviewState === 'done'
         ? row.reviewState
         : 'unreviewed',
+    warnings: parseWarningList(row.warningsJson),
     sourceVideoId: row.sourceVideoId,
     sourceStartUs: row.sourceStartUs,
     sourceEndUs: row.sourceEndUs,
@@ -211,6 +259,14 @@ export function createRecordingService(deps: RecordingDeps) {
       });
       updateVideo(deps.db, clipId, { importJobId: job.id }, now);
       return { jobId: job.id, recording: present(getVideo(deps.db, clipId)) };
+    },
+    async review(id: string): Promise<ReviewItem[]> {
+      const row = getVideo(deps.db, id);
+      const durationUs = row.durationUs ?? 0;
+      return listReviewItems(deps.db, id).flatMap((item) => {
+        const mapped = toReviewItem(item, durationUs);
+        return mapped ? [mapped] : [];
+      });
     },
     async mediaFile(id: string, variant: 'original' | 'proxy') {
       if (!deps.files) throw new ProblemError('NOT_FOUND', 'library files are not configured');

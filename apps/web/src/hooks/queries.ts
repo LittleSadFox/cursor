@@ -107,6 +107,15 @@ export function useImportPath() {
   });
 }
 
+export function useReviewItems(videoId: string, jobStatus: string | null) {
+  const busy = jobStatus === 'queued' || jobStatus === 'running';
+  return useQuery({
+    queryKey: ['recordings', videoId, 'review'],
+    queryFn: () => api.recordings.review(videoId),
+    refetchInterval: busy ? 1500 : false,
+  });
+}
+
 export function useCutRecording() {
   const client = useQueryClient();
   return useMutation({

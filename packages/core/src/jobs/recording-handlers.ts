@@ -1,15 +1,22 @@
 import type { Job } from '@climbing-coach/api';
-import { us, writePosebin } from '@climbing-coach/schema';
+import { PARAMS_VERSION, STARTING_PARAMS, proposeItems } from '@climbing-coach/engine';
+import { parseSignalsJson, readPosebin, us, writePosebin } from '@climbing-coach/schema';
 
-import { insertPoseTrack } from '../db/repos/attempts.js';
+import { findPoseTrack, insertPoseTrack } from '../db/repos/attempts.js';
+import { insertReviewItem, listReviewItems } from '../db/repos/review.js';
 import { getVideo, probeColumns, updateVideo } from '../db/repos/videos.js';
 import type { IdGen } from '../ids/ulid.js';
+import { activityFrames, buildSignalsFile, needsDenseActivitySample, signalsPath, ACTIVITY_MAX_SIDE } from '../ingest/signals.js';
+import { detectFromPoseTrack } from '../ingest/proposals.js';
+import { setCameraMovingWarning } from '../ingest/warnings.js';
+import { detectionWindows } from '../ingest/windows.js';
 import type { BlobStore } from '../ports/blobs.js';
 import type { Clock } from '../ports/clock.js';
+import type { EventBus } from '../ports/events.js';
 import type { MediaFiles } from '../ports/media-files.js';
 import type { PoseExtractor } from '../ports/pose.js';
 import type { AppDatabase } from '../ports/sql.js';
-import type { CutMode, TimeRange, VideoTools } from '../ports/video.js';
+import type { CutMode, TimeRange, VideoFrame, VideoTools } from '../ports/video.js';
 import { clipRelative, originalRelative, proxyRelative } from '../recordings/paths.js';
 import type { StepHandler } from './types.js';
 
@@ -44,6 +51,22 @@ function importPayload(job: Job): ImportPayload {
 const DETECTION_FPS = 15;
 const DETECTION_MAX_SIDE = 640;
 
+async function collectFrames(
+  frames: AsyncIterable<VideoFrame>,
+  signal?: AbortSignal,
+): Promise<VideoFrame[]> {
+  const out: VideoFrame[] = [];
+  for await (const frame of frames) {
+    if (signal?.aborted) throw new Error('activity decode aborted');
+    out.push(frame);
+  }
+  return out;
+}
+
+function confidenceOf(level: 'high' | 'low'): number {
+  return level === 'high' ? 0.8 : 0.4;
+}
+
 export type RecordingHandlerDeps = {
   db: AppDatabase;
   clock: Clock;
@@ -52,6 +75,7 @@ export type RecordingHandlerDeps = {
   pose?: PoseExtractor | undefined;
   blobs?: BlobStore | undefined;
   ids?: IdGen | undefined;
+  events?: EventBus | undefined;
 };
 
 export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, StepHandler> {
@@ -106,6 +130,45 @@ export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, St
     },
     'import-recording.quick-hash': async ({ job }) => hash(job, 'quick'),
     'import-recording.probe': async ({ job }) => runProbe(job),
+    'import-recording.activity': async ({ job, signal }) => {
+      if (!deps.blobs) return { skipped: true, reason: 'blob store unavailable' };
+      const id = videoIdOf(job);
+      const row = getVideo(db, id);
+      const absolute = files.absolute(row.path);
+      const probed = await video.probe(absolute);
+      const durationUs = probed.durationUs;
+      const keyframes = probed.frames.filter((frame) => frame.keyframe).map((frame) => frame.tUs);
+      const dense = needsDenseActivitySample(keyframes, durationUs);
+      const decoded = await collectFrames(
+        dense
+          ? video.frames(absolute, {
+              windows: durationUs > 0 ? [{ startUs: us(0), endUs: us(durationUs) }] : [],
+              sampleFps: STARTING_PARAMS.activity.sampleFps,
+              maxSide: ACTIVITY_MAX_SIDE,
+              toSdr: true,
+              ...(signal ? { signal } : {}),
+            })
+          : video.keyframes(absolute, {
+              maxSide: ACTIVITY_MAX_SIDE,
+              ...(signal ? { signal } : {}),
+            }),
+        signal,
+      );
+      const signals = buildSignalsFile(id, durationUs, activityFrames(decoded));
+      await deps.blobs.write(signalsPath(id), new TextEncoder().encode(JSON.stringify(signals)));
+      updateVideo(
+        db,
+        id,
+        { warningsJson: setCameraMovingWarning(row.warningsJson, signals.warnings.includes('camera_moving')) },
+        clock.nowIso(),
+      );
+      return {
+        windows: signals.activeWindows.length,
+        samples: signals.samples.length,
+        dense,
+        warnings: signals.warnings,
+      };
+    },
     'import-recording.proxy': async ({ job, signal }) => runProxy(job, signal),
     'import-recording.pose-detection': async ({ job, signal }) => {
       if (!deps.pose?.ready() || !deps.blobs || !deps.ids) {
@@ -114,8 +177,16 @@ export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, St
       const id = videoIdOf(job);
       const row = getVideo(db, id);
       const durationUs = row.durationUs ?? 0;
-      const windows =
-        durationUs > 0 ? [{ startUs: us(0), endUs: us(durationUs) }] : [];
+      let signals = null;
+      if (deps.blobs) {
+        try {
+          const bytes = await deps.blobs.read(signalsPath(id));
+          signals = parseSignalsJson(new TextDecoder().decode(bytes));
+        } catch {
+          signals = null;
+        }
+      }
+      const windows = detectionWindows(signals, durationUs);
       const rotation = ([0, 90, 180, 270] as const).includes(
         Math.abs(row.rotation) as 0 | 90 | 180 | 270,
       )
@@ -166,6 +237,53 @@ export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, St
         persons: summary.persons,
         path,
       };
+    },
+    'import-recording.propose': async ({ job }) => {
+      if (!deps.blobs || !deps.ids) {
+        return { skipped: true, reason: 'pose runtime unavailable' };
+      }
+      const id = videoIdOf(job);
+      const trackRow = findPoseTrack(db, id, 'detection') ?? findPoseTrack(db, id, 'hq');
+      if (!trackRow) return { skipped: true, reason: 'no pose track' };
+      const attempts = detectFromPoseTrack(readPosebin(await deps.blobs.read(trackRow.path)));
+      const existing = listReviewItems(db, id);
+      const fresh = attempts.filter(
+        (attempt) =>
+          !existing.some(
+            (row) => row.climbStartUs === attempt.startUs && row.climbEndUs === attempt.endUs,
+          ),
+      );
+      const ids = fresh.map(() => deps.ids!.ulid());
+      const drafts = proposeItems(fresh, ids);
+      const now = clock.nowIso();
+      const padding = STARTING_PARAMS.padding;
+      drafts.forEach((draft, index) => {
+        const attempt = fresh[index];
+        if (!attempt) return;
+        insertReviewItem(
+          db,
+          {
+            id: draft.id,
+            videoId: id,
+            outcome: draft.outcome,
+            climbStartUs: draft.climb.startUs,
+            climbEndUs: draft.climb.endUs,
+            prePadUs: padding.preUs,
+            postPadUs: padding.postUs,
+            confidence: confidenceOf(attempt.startConfidence),
+            detectorVersion: PARAMS_VERSION,
+            parentIds: draft.parentIds,
+          },
+          now,
+        );
+      });
+      if (drafts.length > 0) {
+        const row = getVideo(db, id);
+        const revision = row.reviewRevision + 1;
+        updateVideo(db, id, { reviewState: 'in_review', reviewRevision: revision }, now);
+        deps.events?.publish({ type: 'review.updated', recordingId: id, revision });
+      }
+      return { proposed: drafts.length };
     },
     'import-recording.full-hash': async ({ job, signal }) => hash(job, 'full', signal),
     'cut-recording.cut': async ({ job, signal }) => {

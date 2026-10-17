@@ -104,7 +104,9 @@ tools (probe, quick/full hash, frame source, H.264 proxy, lossless/reencode/auto
 thumbnail/filmstrip/loupe) behind a core `VideoTools` port, P1.8 pose adapter (RTMDet-nano +
 RTMPose-m Halpe-26 on `onnxruntime-node`; ADR-001 Accepted provisional), and the smallest
 recordings import on `/recordings` (upload or absolute path, probe, proxy, cut, detection pose
-job, skeleton overlay). Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell
+job, skeleton overlay). P2-B.1 slice: keyframe activity (`signals/<videoId>.json`), detection
+pose on those windows (whole recording if the pass finds none), and detector proposals listed
+on the recording with a cut of the padded range. Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell
 + homepage training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades`
 are pure. Health is `ok` only when both ffmpeg and pose weights are present; the P0.8 locator
 reports bundled/env ffmpeg only (Linux PATH can run tools but `ffmpeg.available` stays false).
@@ -114,7 +116,8 @@ the web `/compare` view (playback controller, skeleton/ghost renderer, divergenc
 panel, alignment feedback labels).
 
 **Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off accuracy gates
-(P0.5–P0.6), Apple signing (ADR-002 stays Proposed), the rest of ingest/review (P2-B: activity,
-proposals, filmstrip/loupe UI), library/player/rating (P2-C), Electron packaging (P2-D),
-comparison video playback and export (P3.6), wall-relative ghost alignment, mobile.
+(P0.5–P0.6), Apple signing (ADR-002 stays Proposed), the rest of review (P2-B.2 filmstrip,
+loupe, undo, split/merge; P2-B.3 commit into attempts, clip pose, moves), library/player/rating
+(P2-C), Electron packaging (P2-D), comparison video playback and export (P3.6), wall-relative
+ghost alignment, mobile.
 Implement those only when the matching phase item says so and prerequisites exist.

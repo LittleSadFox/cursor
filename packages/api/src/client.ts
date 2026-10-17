@@ -11,6 +11,7 @@ import {
   type RecordingCut,
   type RecordingImport,
 } from './recordings.js';
+import { ReviewItemSchema } from './review.js';
 import { isProblem, ProblemError, type Problem, type ProblemCode } from './problems.js';
 import type { Session, SessionInput, SessionPatch } from './sessions.js';
 import { SettingsSchema, type Settings, type SettingsPatch } from './settings.js';
@@ -162,6 +163,10 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
         request<RecordingAccepted>('POST', '/recordings', input),
       cut: (id, input: RecordingCut) =>
         request<RecordingAccepted>('POST', `/recordings/${id}/cut`, input),
+      review: async (id) => {
+        const rows = await request<unknown[]>('GET', `/recordings/${id}/review`);
+        return rows.map((row) => ReviewItemSchema.parse(row));
+      },
     },
     comparisons: {
       create: (input) => comparison('POST', '/comparisons', input),

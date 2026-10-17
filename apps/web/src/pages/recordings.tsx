@@ -6,6 +6,7 @@ import type { CutMode, Recording } from '@climbing-coach/api';
 import { uploadRecording } from '../api.js';
 import { errorText, translate } from '../format.js';
 import { useCutRecording, useHealth, useImportPath, useRecordings } from '../hooks/queries.js';
+import { RecordingProposals } from './recording-proposals.js';
 import { RecordingSkeletonOverlay } from './recording-skeleton.js';
 import { recordingsGate } from './recordings-gate.js';
 import {
@@ -100,6 +101,7 @@ function RecordingDetail({ recording, canCut }: { recording: Recording; canCut: 
       ) : (
         <p>{i18n._('recordings.proxyWait')}</p>
       )}
+      <RecordingProposals recording={recording} canCut={canCut} />
       {canCut ? (
         <form
           className="cut-form"
