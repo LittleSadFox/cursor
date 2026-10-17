@@ -34,7 +34,19 @@ const consoleLogger: Logger = {
   error: (fields, message) => console.error(JSON.stringify({ level: 'error', message, ...fields })),
 };
 
+function failLoud(label: string, err: unknown): never {
+  console.error(`[climbing-coach] ${label}`);
+  console.error(err);
+  process.exit(1);
+}
+
+process.on('uncaughtException', (err) => failLoud('uncaughtException', err));
+process.on('unhandledRejection', (err) => failLoud('unhandledRejection', err));
+
 async function main(): Promise<void> {
+  console.error(
+    `[climbing-coach] starting (COACH_DEV=${process.env.COACH_DEV ?? ''}, cwd=${process.cwd()})…`,
+  );
   const config = launchConfig(process.env, (bytes) => randomBytes(bytes).toString('hex'));
   const clock = systemClock();
   const configDir = process.env.COACH_CONFIG_DIR || appConfigDir();
@@ -99,7 +111,16 @@ async function main(): Promise<void> {
     opened.close();
   });
 
-  await app.listen({ host: '127.0.0.1', port: config.port });
+  try {
+    await app.listen({ host: '127.0.0.1', port: config.port });
+  } catch (err) {
+    failLoud(
+      `listen failed on 127.0.0.1:${config.port} (is another process using it? lsof -nP -iTCP:${config.port} -sTCP:LISTEN)`,
+      err,
+    );
+  }
+  // Plain line so a Mac terminal shows the URL even when JSON logs scroll by.
+  console.log(`climbing-coach API listening on http://127.0.0.1:${config.port}`);
   app.log.info(
     {
       apiVersion: API_VERSION,
@@ -117,7 +138,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
-});
+main().catch((err: unknown) => failLoud('failed to start', err));

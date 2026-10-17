@@ -1,6 +1,8 @@
 import { useLingui } from '@lingui/react';
 import { Link, Outlet } from '@tanstack/react-router';
 
+import { ApiStatusBanner } from './api-status.js';
+
 const NAV = [
   { to: '/', label: 'nav.home' },
   { to: '/library', label: 'nav.library' },
@@ -25,6 +27,7 @@ export function Shell() {
         </nav>
       </header>
       <main className="content">
+        <ApiStatusBanner />
         <Outlet />
       </main>
     </div>

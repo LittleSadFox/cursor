@@ -422,3 +422,24 @@ button:disabled {
   align-items: center;
   color: var(--muted);
 }
+
+.boot-fallback {
+  margin: 1.5rem;
+  max-width: 40rem;
+}
+
+.boot-fallback code {
+  font-size: 0.9em;
+}
+
+.api-down {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #c45c4a;
+  background: #2a1814;
+  color: #f0d0c8;
+}
+
+.api-down code {
+  font-size: 0.9em;
+}

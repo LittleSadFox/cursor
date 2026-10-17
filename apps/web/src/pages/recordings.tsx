@@ -6,7 +6,7 @@ import type { CutMode, Recording } from '@climbing-coach/api';
 import { uploadRecording } from '../api.js';
 import { errorText, translate } from '../format.js';
 import { useCutRecording, useHealth, useImportPath, useRecordings } from '../hooks/queries.js';
-import { recordingsImportReady } from './recordings-gate.js';
+import { recordingsGate } from './recordings-gate.js';
 import {
   formatDuration,
   formatFps,
@@ -152,15 +152,21 @@ export function RecordingsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const items = recordings.data ?? [];
   const current = items.find((item) => item.id === selected) ?? items[0] ?? null;
-  const importReady = health.data ? recordingsImportReady(health.data) : false;
+  const gate = recordingsGate(health);
+  const importReady = gate === 'ready';
 
   return (
     <div className="recordings">
       <section className="panel">
         <h1>{i18n._('recordings.title')}</h1>
         <p className="lede">{i18n._('recordings.lede')}</p>
-        {health.isLoading ? <p>{i18n._('recordings.checkingFfmpeg')}</p> : null}
-        {health.data && !importReady ? (
+        {gate === 'loading' ? <p>{i18n._('recordings.checkingFfmpeg')}</p> : null}
+        {gate === 'api-down' ? (
+          <p className="api-down" role="alert">
+            {i18n._('api.down')}
+          </p>
+        ) : null}
+        {gate === 'ffmpeg-missing' ? (
           <p className="status" role="status">
             {i18n._('recordings.ffmpegMissing')}
           </p>

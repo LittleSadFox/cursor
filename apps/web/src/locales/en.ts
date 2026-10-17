@@ -1,6 +1,8 @@
 /** English catalog (Lingui). Messages with `{name}` placeholders go through `translate`. */
 export const messages: Record<string, string> = {
   'app.name': 'Climbing Coach',
+  'api.down':
+    'Local API not running on 127.0.0.1:8787 — run `pnpm --filter @climbing-coach/server dev` in another terminal, then refresh. Confirm with curl http://127.0.0.1:8787/api/v1/health (Bearer dev-token).',
   'nav.home': 'Home',
   'nav.library': 'Library',
   'nav.recordings': 'Recordings',
