@@ -63,6 +63,25 @@ describe('review draft', () => {
     expect((await api.recordings.get(id)).reviewState).toBe('in_review');
   });
 
+  it('brings the split row back when an undo saves it again', async () => {
+    const { api, id, state, detected } = await importedReview();
+    const mid = Math.round((detected.climb.startUs + detected.climb.endUs) / 2);
+    const split = await api.review.save(id, {
+      baseRevision: state.revision,
+      items: [
+        asInput(detected, { id: 'new-l', climb: { ...detected.climb, endUs: mid } }),
+        asInput(detected, { id: 'new-r', climb: { ...detected.climb, startUs: mid } }),
+      ],
+    });
+    const undone = await api.review.save(id, {
+      baseRevision: split.revision,
+      items: [asInput(detected)],
+    });
+    expect(undone.items.map((item) => [item.id, item.climb])).toEqual([
+      [detected.id, detected.climb],
+    ]);
+  });
+
   it('rejects a stale base revision', async () => {
     const { api, id, state, detected } = await importedReview();
     await api.review.save(id, { baseRevision: state.revision, items: [asInput(detected)] });

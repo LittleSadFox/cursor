@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, type SQL } from 'drizzle-orm';
 
 import type { AppDatabase } from '../../ports/sql.js';
 import { reviewItems } from '../schema.js';
@@ -64,7 +64,7 @@ function parseIds(json: string): string[] {
   }
 }
 
-export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+function selectReviewItems(db: AppDatabase, where: SQL | undefined): ReviewItemRow[] {
   return db
     .select({
       id: reviewItems.id,
@@ -81,7 +81,7 @@ export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow
       touched: reviewItems.touched,
     })
     .from(reviewItems)
-    .where(and(eq(reviewItems.videoId, videoId), isNull(reviewItems.deletedAt)))
+    .where(where)
     .orderBy(asc(reviewItems.climbStartUs), asc(reviewItems.id))
     .all()
     .map(({ derivedFromJson, touched, ...row }) => ({
@@ -89,6 +89,25 @@ export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow
       parentIds: parseIds(derivedFromJson),
       touched: touched === 1,
     }));
+}
+
+export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+  return selectReviewItems(
+    db,
+    and(eq(reviewItems.videoId, videoId), isNull(reviewItems.deletedAt)),
+  );
+}
+
+/** Soft-deleted, uncommitted rows: an undo across autosaves may bring one back. */
+export function listRetiredReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+  return selectReviewItems(
+    db,
+    and(
+      eq(reviewItems.videoId, videoId),
+      isNotNull(reviewItems.deletedAt),
+      ne(reviewItems.status, 'committed'),
+    ),
+  );
 }
 
 export function insertReviewItem(
@@ -172,6 +191,14 @@ export function retireReviewItems(db: AppDatabase, ids: readonly string[], nowIs
   if (ids.length === 0) return;
   db.update(reviewItems)
     .set({ deletedAt: nowIso, updatedAt: nowIso })
+    .where(inArray(reviewItems.id, [...ids]))
+    .run();
+}
+
+export function reviveReviewItems(db: AppDatabase, ids: readonly string[], nowIso: string): void {
+  if (ids.length === 0) return;
+  db.update(reviewItems)
+    .set({ deletedAt: null, updatedAt: nowIso })
     .where(inArray(reviewItems.id, [...ids]))
     .run();
 }

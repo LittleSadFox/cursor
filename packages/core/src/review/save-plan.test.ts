@@ -45,10 +45,16 @@ function input(
   };
 }
 
-function plan(existing: ReviewItemRow[], items: ReviewItemInput[], durationUs = 10_000_000) {
+function plan(
+  existing: ReviewItemRow[],
+  items: ReviewItemInput[],
+  durationUs = 10_000_000,
+  retired: ReviewItemRow[] = [],
+) {
   const args: SavePlanInput = {
     videoId: 'video',
     existing,
+    retired,
     items,
     durationUs,
     padding: { preUs: 2_000_000, postUs: 1_500_000 },
@@ -72,6 +78,7 @@ describe('planReviewSave', () => {
       updates: [],
       inserts: [],
       retireIds: [],
+      reviveIds: [],
       idMap: {},
     });
   });
@@ -108,6 +115,15 @@ describe('planReviewSave', () => {
     ]);
     expect(result.idMap).toEqual({ 'new-a': NEW, 'new-b': NEW });
     expect(result.inserts[0]?.prePadUs).toBe(2_000_000);
+  });
+
+  it('brings back a retired row when an undo sends it again', () => {
+    const left = row(B, 0, 2_000, { origin: 'detector', parentIds: [A], touched: true });
+    const result = plan([left], [input(A, 0, 4_000)], 10_000_000, [row(A, 0, 4_000)]);
+    expect(result.reviveIds).toEqual([A]);
+    expect(result.retireIds).toEqual([B]);
+    expect(result.updates).toEqual([]);
+    expect(result.inserts).toEqual([]);
   });
 
   it('stores a manual add as origin manual', () => {

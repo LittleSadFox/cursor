@@ -8,8 +8,10 @@ import { STARTING_PARAMS } from '@climbing-coach/engine';
 
 import {
   insertUserReviewItem,
+  listRetiredReviewItems,
   listReviewItems,
   retireReviewItems,
+  reviveReviewItems,
   updateReviewItem,
 } from '../db/repos/review.js';
 import { getVideo, updateVideo } from '../db/repos/videos.js';
@@ -63,6 +65,7 @@ export function createReviewService(deps: ReviewDeps) {
     const now = clock.nowIso();
     return inTransaction(db, (tx) => {
       retireReviewItems(tx, plan.retireIds, now);
+      reviveReviewItems(tx, plan.reviveIds, now);
       for (const { id, patch } of plan.updates) updateReviewItem(tx, id, patch, now);
       for (const insert of plan.inserts) insertUserReviewItem(tx, insert, now);
       const revision = getVideo(tx, recordingId).reviewRevision + 1;
@@ -89,6 +92,7 @@ export function createReviewService(deps: ReviewDeps) {
       const plan = planReviewSave({
         videoId: recordingId,
         existing: listReviewItems(db, recordingId),
+        retired: listRetiredReviewItems(db, recordingId),
         items: input.items,
         durationUs: row.durationUs,
         padding: STARTING_PARAMS.padding,

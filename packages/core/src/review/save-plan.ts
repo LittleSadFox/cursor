@@ -12,12 +12,15 @@ export type SavePlan = {
   inserts: InsertUserReviewItemInput[];
   /** Stored rows the draft no longer has (replaced by a split or merge, or removed). */
   retireIds: string[];
+  /** Soft-deleted rows the draft sent again (an undo across autosaves); they come back. */
+  reviveIds: string[];
   idMap: Record<string, string>;
 };
 
 export type SavePlanInput = {
   videoId: string;
   existing: readonly ReviewItemRow[];
+  retired: readonly ReviewItemRow[];
   items: readonly ReviewItemInput[];
   durationUs: number | null;
   padding: { preUs: number; postUs: number };
@@ -138,13 +141,14 @@ function insertFor(
  * server must not store.
  */
 export function planReviewSave(input: SavePlanInput): SavePlan {
-  const rows = new Map(input.existing.map((row) => [row.id, row]));
+  const rows = new Map([...input.retired, ...input.existing].map((row) => [row.id, row]));
+  const retired = new Set(input.retired.map((row) => row.id));
   assertUniqueIds(input.items);
   assertKnownIds(input.items, rows);
   assertInsideRecording(input.items, input.durationUs);
   assertNoOverlap(input.items, input.existing);
 
-  const plan: SavePlan = { updates: [], inserts: [], retireIds: [], idMap: {} };
+  const plan: SavePlan = { updates: [], inserts: [], retireIds: [], reviveIds: [], idMap: {} };
   for (const item of input.items) {
     const row = rows.get(item.id);
     if (!row) {
@@ -153,6 +157,7 @@ export function planReviewSave(input: SavePlanInput): SavePlan {
       plan.inserts.push(insertFor(input, item, id));
       continue;
     }
+    if (retired.has(row.id)) plan.reviveIds.push(row.id);
     const patch = changedPatch(row, item);
     if (patch) plan.updates.push({ id: row.id, patch });
   }
