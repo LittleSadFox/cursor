@@ -28,6 +28,8 @@ export const RecordingSchema = z.object({
   kind: z.enum(['original', 'clip']),
   fileName: z.string(),
   proxyReady: z.boolean(),
+  /** True when a detection (or hq) pose track exists for this video. */
+  hasPose: z.boolean(),
   quickHash: z.string().nullable(),
   sha256: z.string().nullable(),
   durationUs: z.number().int().nullable(),

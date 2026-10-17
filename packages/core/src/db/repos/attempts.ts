@@ -96,3 +96,37 @@ export function getPoseTrackRecord(db: AppDatabase, id: string): PoseTrackRecord
   if (!row) throw new ProblemError('NOT_FOUND', `pose track ${id} not found`);
   return row;
 }
+
+export type InsertPoseTrackInput = {
+  id: string;
+  videoId: string;
+  kind: string;
+  runtime: string;
+  model: string;
+  modelVersion: string;
+  sampleFps: number;
+  path: string;
+  windowsJson?: string;
+};
+
+export function insertPoseTrack(
+  db: AppDatabase,
+  input: InsertPoseTrackInput,
+  nowIso: string,
+): void {
+  db.insert(poseTracks)
+    .values({
+      id: input.id,
+      videoId: input.videoId,
+      kind: input.kind,
+      runtime: input.runtime,
+      model: input.model,
+      modelVersion: input.modelVersion,
+      sampleFps: input.sampleFps,
+      windowsJson: input.windowsJson ?? '[]',
+      path: input.path,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    })
+    .run();
+}

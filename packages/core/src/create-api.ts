@@ -13,6 +13,7 @@ import type { Clock } from './ports/clock.js';
 import type { EventBus } from './ports/events.js';
 import type { Logger } from './ports/logger.js';
 import type { MediaFiles } from './ports/media-files.js';
+import type { PoseExtractor } from './ports/pose.js';
 import type { AppDatabase, SqlExecutor, SqliteBackup } from './ports/sql.js';
 import type { VideoTools } from './ports/video.js';
 import { createRecordingService } from './recordings/service.js';
@@ -38,6 +39,9 @@ export type CoreDeps = {
   ffmpegVersion?: string | null;
   ffmpegNote?: string;
   poseAvailable?: boolean;
+  poseVersion?: string | null;
+  poseNote?: string;
+  pose?: PoseExtractor | undefined;
   video?: VideoTools | undefined;
   mediaFiles?: MediaFiles | undefined;
   mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
@@ -70,6 +74,9 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
             clock,
             video: deps.video,
             files: deps.mediaFiles,
+            pose: deps.pose,
+            blobs: deps.blobs,
+            ids: deps.ids,
           })
         : {}),
     },
@@ -97,6 +104,8 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
       onLibraryRootChange: deps.onLibraryRootChange,
       ...(deps.ffmpegVersion !== undefined ? { ffmpegVersion: deps.ffmpegVersion } : {}),
       ...(deps.ffmpegNote !== undefined ? { ffmpegNote: deps.ffmpegNote } : {}),
+      ...(deps.poseVersion !== undefined ? { poseVersion: deps.poseVersion } : {}),
+      ...(deps.poseNote !== undefined ? { poseNote: deps.poseNote } : {}),
     }),
     ...createCatalogService({ db, clock, ids: deps.ids }),
     ...createTrainingService(db, clock),

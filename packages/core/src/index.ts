@@ -33,6 +33,13 @@ export { systemClock, isoFromMs, type Clock } from './ports/clock.js';
 export { createEventBus, type EventBus } from './ports/events.js';
 export { silentLogger, type Logger } from './ports/logger.js';
 export type { MediaFiles } from './ports/media-files.js';
+export type {
+  PoseExtractOptions,
+  PoseExtractSummary,
+  PoseExtractor,
+  PoseProgress,
+  PoseRuntimeInfo,
+} from './ports/pose.js';
 export type { AppDatabase, SqlExecutor, SqlValue, SqliteBackup } from './ports/sql.js';
 export type {
   CutMode,

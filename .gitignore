@@ -11,6 +11,8 @@ coverage/
 .vite/
 .eslintcache
 datasets/media/
+vendor/pose/models/
+
 research/**/__pycache__/
 research/**/.venv/
 research/pose-lab/fixtures/*.posebin

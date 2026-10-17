@@ -4,6 +4,7 @@ import { API_VERSION } from '@climbing-coach/api';
 import {
   appConfigDir,
   backupsDir,
+  createNodePoseExtractor,
   createNodeVideoTools,
   defaultLibraryRoot,
   libraryBlobs,
@@ -12,6 +13,7 @@ import {
   nodeRandomBytes,
   openSqliteLibrary,
   probeFfmpegStatus,
+  probePoseStatus,
   readLibraryPointer,
   signMedia,
   writeLibraryPointer,
@@ -64,6 +66,8 @@ async function main(): Promise<void> {
   let persistLibraryRoot = false;
   const events = createEventBus(() => clock.nowMs());
   const ffmpeg = probeFfmpegStatus();
+  const poseStatus = probePoseStatus();
+  const pose = createNodePoseExtractor();
   const video = createNodeVideoTools();
   const mediaFiles = libraryMediaFiles(libraryRoot);
   const mediaUrl = (videoId: string, variant: 'original' | 'proxy') =>
@@ -80,7 +84,10 @@ async function main(): Promise<void> {
     ffmpegAvailable: ffmpeg.available,
     ffmpegVersion: ffmpeg.version,
     ffmpegNote: ffmpeg.note,
-    poseAvailable: false,
+    poseAvailable: poseStatus.available && pose.ready(),
+    poseVersion: poseStatus.version,
+    poseNote: poseStatus.note,
+    pose,
     video,
     mediaFiles,
     mediaUrl,

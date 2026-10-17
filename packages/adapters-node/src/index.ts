@@ -1,6 +1,6 @@
 /**
  * Node/desktop port implementations (BUILD_PLAN §2).
- * Pose runtime still waits on ADR-001. Video tools are P1.7 (`video/`).
+ * Pose runtime is P1.8 / ADR-001 (`pose/`). Video tools are P1.7 (`video/`).
  */
 export const ADAPTERS_NODE_VERSION = '0.0.0';
 
@@ -49,3 +49,7 @@ export { createNodeVideoTools, assertSafeOutputArgs } from './video/tools.js';
 export { libraryMediaFiles } from './media-files.js';
 export { nodeRandomBytes } from './random.js';
 export { libraryBlobs } from './blobs.js';
+
+export { createNodePoseExtractor } from './pose/extractor.js';
+export { locatePoseModels, loadBundledManifest, DETECTOR_ID, POSE_ID } from './pose/models.js';
+export { probePoseStatus, type PoseStatus } from './pose/status.js';
