@@ -27,9 +27,11 @@ export const IMPORT_PIPELINE: Pipeline = {
     { name: 'place', resource: 'ffmpeg', dependsOn: [] },
     { name: 'quick-hash', resource: 'compute', dependsOn: ['place'] },
     { name: 'probe', resource: 'ffmpeg', dependsOn: ['quick-hash'] },
+    /** Keyframe activity, then pose only on those windows. Proxy stays parallel (BUILD_PLAN §3.3). */
+    { name: 'activity', resource: 'ffmpeg', dependsOn: ['probe'] },
     { name: 'proxy', resource: 'ffmpeg', dependsOn: ['probe'] },
-    /** Detection-rate pose after probe; parallel with proxy (BUILD_PLAN P1.8 / §3.3). */
-    { name: 'pose-detection', resource: 'pose', dependsOn: ['probe'] },
+    { name: 'pose-detection', resource: 'pose', dependsOn: ['activity'] },
+    { name: 'propose', resource: 'compute', dependsOn: ['pose-detection'] },
     { name: 'full-hash', resource: 'idle', dependsOn: ['place'] },
   ],
 };

@@ -31,6 +31,9 @@ export function registerRecordingRoutes(app: FastifyInstance, api: CoachApi): vo
 
   app.get('/api/v1/recordings', async () => api.recordings.list());
   app.get('/api/v1/recordings/:id', async (request) => api.recordings.get(idParam(request)));
+  app.get('/api/v1/recordings/:id/review', async (request) =>
+    api.recordings.review(idParam(request)),
+  );
   app.post('/api/v1/recordings', async (request, reply) => {
     const created = await api.recordings.importPath(RecordingImportSchema.parse(request.body));
     return reply.code(202).send(created);

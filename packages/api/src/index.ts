@@ -166,6 +166,7 @@ export {
   type RecordingImport,
 } from './recordings.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
+export { ReviewItemSchema, type ReviewItem } from './review.js';
 export type { CoachApi, Crud } from './coach-api.js';
 export {
   createHttpCoachApi,

@@ -44,6 +44,7 @@ export const RecordingSchema = z.object({
   dolbyVision: z.string().nullable(),
   frameCount: z.number().int().nullable(),
   reviewState: z.enum(['unreviewed', 'in_review', 'done']),
+  warnings: z.array(z.string()).default([]),
   sourceVideoId: z.string().nullable(),
   sourceStartUs: z.number().int().nullable(),
   sourceEndUs: z.number().int().nullable(),

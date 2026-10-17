@@ -5,11 +5,14 @@ import {
   type RecordingAccepted,
   type RecordingCut,
   type RecordingImport,
+  type ReviewItem,
 } from '@climbing-coach/api';
 
 import { findPoseTrack } from '../db/repos/attempts.js';
 import { getJob } from '../db/repos/jobs.js';
+import { listReviewItems } from '../db/repos/review.js';
 import { getVideo, insertVideo, listVideos, updateVideo } from '../db/repos/videos.js';
+import { parseWarningList } from '../ingest/warnings.js';
 import type { IdGen } from '../ids/ulid.js';
 import type { JobRunner } from '../jobs/runner.js';
 import type { Clock } from '../ports/clock.js';
@@ -17,6 +20,7 @@ import type { MediaFiles } from '../ports/media-files.js';
 import type { AppDatabase } from '../ports/sql.js';
 import { VideoToolError, type VideoTools } from '../ports/video.js';
 import { contentTypeFor, fileBaseName } from './paths.js';
+import { toReviewItem } from './review-items.js';
 import type { videos } from '../db/schema.js';
 
 export type RecordingDeps = {
@@ -71,6 +75,7 @@ function toRecording(
       row.reviewState === 'in_review' || row.reviewState === 'done'
         ? row.reviewState
         : 'unreviewed',
+    warnings: parseWarningList(row.warningsJson),
     sourceVideoId: row.sourceVideoId,
     sourceStartUs: row.sourceStartUs,
     sourceEndUs: row.sourceEndUs,
@@ -211,6 +216,14 @@ export function createRecordingService(deps: RecordingDeps) {
       });
       updateVideo(deps.db, clipId, { importJobId: job.id }, now);
       return { jobId: job.id, recording: present(getVideo(deps.db, clipId)) };
+    },
+    async review(id: string): Promise<ReviewItem[]> {
+      const row = getVideo(deps.db, id);
+      const durationUs = row.durationUs ?? 0;
+      return listReviewItems(deps.db, id).flatMap((item) => {
+        const mapped = toReviewItem(item, durationUs);
+        return mapped ? [mapped] : [];
+      });
     },
     async mediaFile(id: string, variant: 'original' | 'proxy') {
       if (!deps.files) throw new ProblemError('NOT_FOUND', 'library files are not configured');

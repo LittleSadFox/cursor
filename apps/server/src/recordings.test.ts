@@ -123,7 +123,7 @@ describe('recording upload', () => {
     expect(upload.statusCode).toBe(202);
     const created = upload.json() as { recording: { id: string; fileName: string } };
     expect(created.recording.fileName).toBe('gym.mov');
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 16; i += 1) {
       if ((await api.jobsRunner.tick()) === 0) break;
     }
     const listed = await app.inject({

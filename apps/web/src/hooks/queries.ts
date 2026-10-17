@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   CutMode,
+  Recording,
   RecordingImport,
   SettingsPatch,
   TrainingLogInput,
@@ -10,6 +11,7 @@ import type {
 
 import { api } from '../api.js';
 import { isoWeekOf, localDate, rangeFrom, type RangeKey } from '../dates.js';
+import { jobBusy } from '../pages/recordings-format.js';
 
 export function useSettings() {
   return useQuery({ queryKey: ['settings'], queryFn: () => api.system.getSettings() });
@@ -89,9 +91,7 @@ export function useRecordings() {
     queryKey: ['recordings'],
     queryFn: () => api.recordings.list(),
     refetchInterval: (query) => {
-      const busy = (query.state.data ?? []).some(
-        (row) => row.jobStatus === 'queued' || row.jobStatus === 'running',
-      );
+      const busy = (query.state.data ?? []).some((row) => jobBusy(row.jobStatus));
       return busy ? 1500 : false;
     },
   });
@@ -104,6 +104,19 @@ export function useImportPath() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['recordings'] });
     },
+  });
+}
+
+/**
+ * The job status is part of the key, so the list refetches once more when the import
+ * job settles. Polling alone would stop before the final `propose` step lands.
+ */
+export function useReviewItems(recording: Pick<Recording, 'id' | 'kind' | 'jobStatus'>) {
+  return useQuery({
+    queryKey: ['recordings', recording.id, 'review', recording.jobStatus],
+    queryFn: () => api.recordings.review(recording.id),
+    enabled: recording.kind === 'original',
+    refetchInterval: jobBusy(recording.jobStatus) ? 1500 : false,
   });
 }
 
