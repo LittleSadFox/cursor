@@ -166,7 +166,41 @@ export {
   type RecordingImport,
 } from './recordings.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
-export { ReviewItemSchema, type ReviewItem } from './review.js';
+export {
+  FilmstripQuerySchema,
+  LoupeQuerySchema,
+  NEW_REVIEW_ITEM_ID,
+  RecordingReprocessSchema,
+  ReprocessScopeSchema,
+  ReviewItemInputSchema,
+  ReviewItemSchema,
+  ReviewOriginSchema,
+  ReviewPaddingSchema,
+  ReviewProcessingSchema,
+  ReviewRangeSchema,
+  ReviewSavedSchema,
+  ReviewSaveSchema,
+  ReviewStateSchema,
+  ReviewStatusSchema,
+  SpriteSchema,
+  SpriteTileSchema,
+  type FilmstripQuery,
+  type LoupeQuery,
+  type RecordingReprocess,
+  type ReprocessScope,
+  type ReviewItem,
+  type ReviewItemInput,
+  type ReviewOrigin,
+  type ReviewPadding,
+  type ReviewProcessing,
+  type ReviewRange,
+  type ReviewSave,
+  type ReviewSaved,
+  type ReviewState,
+  type ReviewStatus,
+  type Sprite,
+  type SpriteTile,
+} from './review.js';
 export type { CoachApi, Crud } from './coach-api.js';
 export {
   createHttpCoachApi,

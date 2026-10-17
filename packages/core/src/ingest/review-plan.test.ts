@@ -18,6 +18,8 @@ function row(
   return {
     id,
     videoId: 'video',
+    origin: 'detector',
+    parentIds: [id],
     outcome: 'fall',
     climbStartUs: startUs,
     climbEndUs: endUs,
@@ -48,7 +50,7 @@ describe('planDetectorUpdate', () => {
     expect(plan.insert.map((item) => item.id)).toEqual(['new']);
   });
 
-  it('keeps touched, rejected, and committed rows and drops overlapping detections', () => {
+  it('keeps touched, rejected, and committed rows and drops detections over them', () => {
     const plan = planDetectorUpdate(
       [
         row('touched', 0, 1_000, { touched: true }),
@@ -59,6 +61,6 @@ describe('planDetectorUpdate', () => {
       ['n1', 'n2', 'n3', 'n4'],
     );
     expect(plan.retireIds).toEqual([]);
-    expect(plan.insert.map((item) => item.id)).toEqual(['n3', 'n4']);
+    expect(plan.insert.map((item) => item.id)).toEqual(['n4']);
   });
 });

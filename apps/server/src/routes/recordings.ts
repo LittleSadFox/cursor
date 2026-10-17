@@ -7,9 +7,13 @@ import type { Readable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
 
 import {
+  FilmstripQuerySchema,
+  LoupeQuerySchema,
   ProblemError,
   RecordingCutSchema,
   RecordingImportSchema,
+  RecordingReprocessSchema,
+  ReviewSaveSchema,
   type CoachApi,
 } from '@climbing-coach/api';
 
@@ -31,8 +35,22 @@ export function registerRecordingRoutes(app: FastifyInstance, api: CoachApi): vo
 
   app.get('/api/v1/recordings', async () => api.recordings.list());
   app.get('/api/v1/recordings/:id', async (request) => api.recordings.get(idParam(request)));
-  app.get('/api/v1/recordings/:id/review', async (request) =>
-    api.recordings.review(idParam(request)),
+  app.get('/api/v1/recordings/:id/review', async (request) => api.review.get(idParam(request)));
+  app.put('/api/v1/recordings/:id/review', async (request) =>
+    api.review.save(idParam(request), ReviewSaveSchema.parse(request.body)),
+  );
+  app.post('/api/v1/recordings/:id/reprocess', async (request, reply) => {
+    const accepted = await api.recordings.reprocess(
+      idParam(request),
+      RecordingReprocessSchema.parse(request.body),
+    );
+    return reply.code(202).send(accepted);
+  });
+  app.get('/api/v1/recordings/:id/filmstrip', async (request) =>
+    api.recordings.filmstrip(idParam(request), FilmstripQuerySchema.parse(request.query)),
+  );
+  app.get('/api/v1/recordings/:id/loupe', async (request) =>
+    api.recordings.loupe(idParam(request), LoupeQuerySchema.parse(request.query).atUs),
   );
   app.post('/api/v1/recordings', async (request, reply) => {
     const created = await api.recordings.importPath(RecordingImportSchema.parse(request.body));

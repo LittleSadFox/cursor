@@ -11,7 +11,14 @@ import {
   type RecordingCut,
   type RecordingImport,
 } from './recordings.js';
-import { ReviewItemSchema } from './review.js';
+import {
+  ReviewSavedSchema,
+  ReviewStateSchema,
+  SpriteSchema,
+  type FilmstripQuery,
+  type RecordingReprocess,
+  type ReviewSave,
+} from './review.js';
 import { isProblem, ProblemError, type Problem, type ProblemCode } from './problems.js';
 import type { Session, SessionInput, SessionPatch } from './sessions.js';
 import { SettingsSchema, type Settings, type SettingsPatch } from './settings.js';
@@ -163,10 +170,17 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
         request<RecordingAccepted>('POST', '/recordings', input),
       cut: (id, input: RecordingCut) =>
         request<RecordingAccepted>('POST', `/recordings/${id}/cut`, input),
-      review: async (id) => {
-        const rows = await request<unknown[]>('GET', `/recordings/${id}/review`);
-        return rows.map((row) => ReviewItemSchema.parse(row));
-      },
+      reprocess: (id, input: RecordingReprocess) =>
+        request<RecordingAccepted>('POST', `/recordings/${id}/reprocess`, input),
+      filmstrip: async (id, q: FilmstripQuery) =>
+        SpriteSchema.parse(await request('GET', `/recordings/${id}/filmstrip`, undefined, q)),
+      loupe: async (id, atUs: number) =>
+        SpriteSchema.parse(await request('GET', `/recordings/${id}/loupe`, undefined, { atUs })),
+    },
+    review: {
+      get: async (id) => ReviewStateSchema.parse(await request('GET', `/recordings/${id}/review`)),
+      save: async (id, input: ReviewSave) =>
+        ReviewSavedSchema.parse(await request('PUT', `/recordings/${id}/review`, input)),
     },
     comparisons: {
       create: (input) => comparison('POST', '/comparisons', input),
