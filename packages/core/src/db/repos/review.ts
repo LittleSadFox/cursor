@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import type { AppDatabase } from '../../ports/sql.js';
 import { reviewItems } from '../schema.js';
@@ -13,6 +13,7 @@ export type ReviewItemRow = {
   postPadUs: number;
   confidence: number | null;
   status: string;
+  touched: boolean;
 };
 
 export type InsertReviewItemInput = {
@@ -40,11 +41,13 @@ export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow
       postPadUs: reviewItems.postPadUs,
       confidence: reviewItems.confidence,
       status: reviewItems.status,
+      touched: reviewItems.touched,
     })
     .from(reviewItems)
     .where(and(eq(reviewItems.videoId, videoId), isNull(reviewItems.deletedAt)))
     .orderBy(asc(reviewItems.climbStartUs), asc(reviewItems.id))
-    .all();
+    .all()
+    .map((row) => ({ ...row, touched: row.touched === 1 }));
 }
 
 export function insertReviewItem(
@@ -74,5 +77,14 @@ export function insertReviewItem(
       createdAt: nowIso,
       updatedAt: nowIso,
     })
+    .run();
+}
+
+/** Soft-deletes review rows a newer detection replaced. */
+export function retireReviewItems(db: AppDatabase, ids: readonly string[], nowIso: string): void {
+  if (ids.length === 0) return;
+  db.update(reviewItems)
+    .set({ deletedAt: nowIso, updatedAt: nowIso })
+    .where(inArray(reviewItems.id, [...ids]))
     .run();
 }

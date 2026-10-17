@@ -7,7 +7,6 @@ import {
   type RecordingImport,
   type ReviewItem,
 } from '@climbing-coach/api';
-import { AttemptOutcomeSchema } from '@climbing-coach/schema';
 
 import { findPoseTrack } from '../db/repos/attempts.js';
 import { getJob } from '../db/repos/jobs.js';
@@ -21,6 +20,7 @@ import type { MediaFiles } from '../ports/media-files.js';
 import type { AppDatabase } from '../ports/sql.js';
 import { VideoToolError, type VideoTools } from '../ports/video.js';
 import { contentTypeFor, fileBaseName } from './paths.js';
+import { toReviewItem } from './review-items.js';
 import type { videos } from '../db/schema.js';
 
 export type RecordingDeps = {
@@ -32,49 +32,6 @@ export type RecordingDeps = {
   files?: MediaFiles | undefined;
   mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
 };
-
-function clipBounds(
-  climbStartUs: number,
-  climbEndUs: number,
-  prePadUs: number,
-  postPadUs: number,
-  durationUs: number,
-): { clipStartUs: number; clipEndUs: number } {
-  const videoEnd = durationUs > 0 ? durationUs : climbEndUs + postPadUs;
-  const clipStartUs = Math.max(0, climbStartUs - prePadUs);
-  const clipEndUs = Math.min(videoEnd, climbEndUs + postPadUs);
-  return { clipStartUs, clipEndUs: Math.max(clipStartUs, clipEndUs) };
-}
-
-function toReviewItem(
-  row: ReturnType<typeof listReviewItems>[number],
-  durationUs: number,
-): ReviewItem | null {
-  const outcome = AttemptOutcomeSchema.safeParse(row.outcome);
-  const status =
-    row.status === 'committed' || row.status === 'rejected' || row.status === 'draft'
-      ? row.status
-      : null;
-  if (!outcome.success || !status) return null;
-  const clip = clipBounds(
-    row.climbStartUs,
-    row.climbEndUs,
-    row.prePadUs,
-    row.postPadUs,
-    durationUs,
-  );
-  return {
-    id: row.id,
-    videoId: row.videoId,
-    outcome: outcome.data,
-    climbStartUs: row.climbStartUs,
-    climbEndUs: row.climbEndUs,
-    clipStartUs: clip.clipStartUs,
-    clipEndUs: clip.clipEndUs,
-    confidence: row.confidence,
-    status,
-  };
-}
 
 function jobOf(db: AppDatabase, id: string | null): Job | null {
   if (!id) return null;

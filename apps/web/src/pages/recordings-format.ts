@@ -24,6 +24,10 @@ export function hashSettled(jobStatus: string | null): boolean {
   return jobStatus === 'succeeded' || jobStatus === 'failed' || jobStatus === 'cancelled';
 }
 
+export function jobBusy(jobStatus: string | null): boolean {
+  return jobStatus === 'queued' || jobStatus === 'running';
+}
+
 export function secondsToUs(seconds: number): number | null {
   if (!Number.isFinite(seconds) || seconds < 0) return null;
   return Math.round(seconds * 1_000_000);
