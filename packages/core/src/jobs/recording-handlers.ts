@@ -1,9 +1,13 @@
 import type { Job } from '@climbing-coach/api';
-import { us } from '@climbing-coach/schema';
+import { us, writePosebin } from '@climbing-coach/schema';
 
+import { insertPoseTrack } from '../db/repos/attempts.js';
 import { getVideo, probeColumns, updateVideo } from '../db/repos/videos.js';
+import type { IdGen } from '../ids/ulid.js';
+import type { BlobStore } from '../ports/blobs.js';
 import type { Clock } from '../ports/clock.js';
 import type { MediaFiles } from '../ports/media-files.js';
+import type { PoseExtractor } from '../ports/pose.js';
 import type { AppDatabase } from '../ports/sql.js';
 import type { CutMode, TimeRange, VideoTools } from '../ports/video.js';
 import { clipRelative, originalRelative, proxyRelative } from '../recordings/paths.js';
@@ -37,11 +41,17 @@ function importPayload(job: Job): ImportPayload {
   return payload as ImportPayload;
 }
 
+const DETECTION_FPS = 15;
+const DETECTION_MAX_SIDE = 640;
+
 export type RecordingHandlerDeps = {
   db: AppDatabase;
   clock: Clock;
   video: VideoTools;
   files: MediaFiles;
+  pose?: PoseExtractor | undefined;
+  blobs?: BlobStore | undefined;
+  ids?: IdGen | undefined;
 };
 
 export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, StepHandler> {
@@ -97,6 +107,66 @@ export function recordingHandlers(deps: RecordingHandlerDeps): Record<string, St
     'import-recording.quick-hash': async ({ job }) => hash(job, 'quick'),
     'import-recording.probe': async ({ job }) => runProbe(job),
     'import-recording.proxy': async ({ job, signal }) => runProxy(job, signal),
+    'import-recording.pose-detection': async ({ job, signal }) => {
+      if (!deps.pose?.ready() || !deps.blobs || !deps.ids) {
+        return { skipped: true, reason: 'pose runtime unavailable' };
+      }
+      const id = videoIdOf(job);
+      const row = getVideo(db, id);
+      const durationUs = row.durationUs ?? 0;
+      const windows =
+        durationUs > 0 ? [{ startUs: us(0), endUs: us(durationUs) }] : [];
+      const rotation = ([0, 90, 180, 270] as const).includes(
+        Math.abs(row.rotation) as 0 | 90 | 180 | 270,
+      )
+        ? ((Math.abs(row.rotation) % 360) as 0 | 90 | 180 | 270)
+        : 0;
+      const summary = await deps.pose.extract(
+        video.frames(files.absolute(row.path), {
+          windows,
+          sampleFps: DETECTION_FPS,
+          maxSide: DETECTION_MAX_SIDE,
+          toSdr: true,
+          ...(signal ? { signal } : {}),
+        }),
+        {
+          videoId: id,
+          kind: 'detection',
+          sampleFps: DETECTION_FPS,
+          displayWidth: row.displayWidth ?? 1,
+          displayHeight: row.displayHeight ?? 1,
+          rotation,
+          windows,
+          maxPersons: 2,
+          ...(signal ? { signal } : {}),
+          nextTrackId: () => deps.ids!.ulid(),
+        },
+      );
+      const poseTrackId = deps.ids.ulid();
+      const path = `pose/${id}.${poseTrackId}.detection.posebin`;
+      await deps.blobs.write(path, writePosebin(summary.track));
+      insertPoseTrack(
+        db,
+        {
+          id: poseTrackId,
+          videoId: id,
+          kind: 'detection',
+          runtime: summary.track.header.runtime,
+          model: summary.track.header.model,
+          modelVersion: summary.track.header.modelVersion ?? '1',
+          sampleFps: DETECTION_FPS,
+          path,
+          windowsJson: JSON.stringify(summary.track.header.windows),
+        },
+        clock.nowIso(),
+      );
+      return {
+        poseTrackId,
+        framesProcessed: summary.framesProcessed,
+        persons: summary.persons,
+        path,
+      };
+    },
     'import-recording.full-hash': async ({ job, signal }) => hash(job, 'full', signal),
     'cut-recording.cut': async ({ job, signal }) => {
       const payload = job.payload as Partial<CutPayload>;

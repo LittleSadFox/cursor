@@ -7,6 +7,7 @@ import {
   type RecordingImport,
 } from '@climbing-coach/api';
 
+import { findPoseTrack } from '../db/repos/attempts.js';
 import { getJob } from '../db/repos/jobs.js';
 import { getVideo, insertVideo, listVideos, updateVideo } from '../db/repos/videos.js';
 import type { IdGen } from '../ids/ulid.js';
@@ -38,16 +39,21 @@ function jobOf(db: AppDatabase, id: string | null): Job | null {
 }
 
 function toRecording(
+  db: AppDatabase,
   row: typeof videos.$inferSelect,
   job: Job | null,
   mediaUrl: RecordingDeps['mediaUrl'],
 ): Recording {
   const proxyReady = Boolean(row.proxyPath);
+  const hasPose = Boolean(
+    findPoseTrack(db, row.id, 'detection') ?? findPoseTrack(db, row.id, 'hq'),
+  );
   return {
     id: row.id,
     kind: row.kind === 'clip' ? 'clip' : 'original',
     fileName: row.fileName || row.path.split('/').pop() || 'video',
     proxyReady,
+    hasPose,
     quickHash: row.quickHash,
     sha256: row.sha256,
     durationUs: row.durationUs,
@@ -88,7 +94,7 @@ export function createRecordingService(deps: RecordingDeps) {
   };
 
   const present = (row: typeof videos.$inferSelect): Recording =>
-    toRecording(row, jobOf(deps.db, row.importJobId), deps.mediaUrl);
+    toRecording(deps.db, row, jobOf(deps.db, row.importJobId), deps.mediaUrl);
 
   return {
     async list(): Promise<Recording[]> {

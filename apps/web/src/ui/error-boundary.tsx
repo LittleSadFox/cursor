@@ -5,18 +5,18 @@ type State = { message: string | null };
 
 /** Keeps the shell visible when a route throws instead of a blank #root. */
 export class AppErrorBoundary extends Component<Props, State> {
-  state: State = { message: null };
+  override state: State = { message: null };
 
   static getDerivedStateFromError(error: unknown): State {
     const message = error instanceof Error ? error.message : String(error);
     return { message: message || 'Unknown render error' };
   }
 
-  componentDidCatch(error: unknown, info: ErrorInfo): void {
+  override componentDidCatch(error: unknown, info: ErrorInfo): void {
     console.error('Climbing Coach UI crashed', error, info.componentStack);
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.message) {
       return (
         <section className="panel" role="alert">

@@ -63,7 +63,7 @@ function files(): MediaFiles {
 }
 
 async function drain(tick: () => Promise<number>): Promise<void> {
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < 16; i += 1) {
     if ((await tick()) === 0) return;
   }
 }
@@ -98,6 +98,7 @@ describe('recording import', () => {
     });
     expect(imported.recording.fileName).toBe('climb.mov');
     expect(imported.recording.proxyReady).toBe(false);
+    expect(imported.recording.hasPose).toBe(false);
     await drain(() => api.jobsRunner.tick());
     const ready = await api.recordings.get(imported.recording.id);
     expect(ready.codec).toBe('h264');

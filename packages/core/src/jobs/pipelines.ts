@@ -28,6 +28,8 @@ export const IMPORT_PIPELINE: Pipeline = {
     { name: 'quick-hash', resource: 'compute', dependsOn: ['place'] },
     { name: 'probe', resource: 'ffmpeg', dependsOn: ['quick-hash'] },
     { name: 'proxy', resource: 'ffmpeg', dependsOn: ['probe'] },
+    /** Detection-rate pose after probe; parallel with proxy (BUILD_PLAN P1.8 / §3.3). */
+    { name: 'pose-detection', resource: 'pose', dependsOn: ['probe'] },
     { name: 'full-hash', resource: 'idle', dependsOn: ['place'] },
   ],
 };

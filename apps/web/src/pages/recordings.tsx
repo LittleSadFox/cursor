@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLingui } from '@lingui/react';
 
 import type { CutMode, Recording } from '@climbing-coach/api';
@@ -6,6 +6,7 @@ import type { CutMode, Recording } from '@climbing-coach/api';
 import { uploadRecording } from '../api.js';
 import { errorText, translate } from '../format.js';
 import { useCutRecording, useHealth, useImportPath, useRecordings } from '../hooks/queries.js';
+import { RecordingSkeletonOverlay } from './recording-skeleton.js';
 import { recordingsGate } from './recordings-gate.js';
 import {
   formatDuration,
@@ -27,6 +28,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 function RecordingDetail({ recording, canCut }: { recording: Recording; canCut: boolean }) {
   const { i18n } = useLingui();
   const cut = useCutRecording();
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [start, setStart] = useState('0');
   const [end, setEnd] = useState(
     recording.durationUs ? String(recording.durationUs / 1_000_000) : '1',
@@ -87,7 +89,14 @@ function RecordingDetail({ recording, canCut }: { recording: Recording; canCut: 
       </dl>
       <h3>{i18n._('recordings.play')}</h3>
       {recording.proxyUrl ? (
-        <video className="player" src={recording.proxyUrl} controls />
+        <div className="player-stage">
+          <video ref={videoRef} className="player" src={recording.proxyUrl} controls />
+          <RecordingSkeletonOverlay
+            videoId={recording.id}
+            hasPose={recording.hasPose}
+            videoRef={videoRef}
+          />
+        </div>
       ) : (
         <p>{i18n._('recordings.proxyWait')}</p>
       )}

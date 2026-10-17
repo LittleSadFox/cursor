@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "license": "Apache-2.0",
+  "licenseNote": "MMPose / MMDetection OpenMMLab weights. No AGPL or GPL models.",
+  "models": {
+    "rtmdet-nano-person": {
+      "role": "detector",
+      "family": "RTMDet-nano",
+      "keypointSet": null,
+      "inputSize": [320, 320],
+      "url": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.zip",
+      "zipSha256": "cb8f6d545a963167acb5a7c98307dcf8a46f7b451ee7e1d8abf2a1f81c26f59d",
+      "onnxRelative": "20230831/rtmdet_onnx/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e/end2end.onnx",
+      "onnxSha256": "8297e829ccc5590c8e2d32d5a211f322a0585fb7467eec85eb12c9525b0b95d6",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/open-mmlab/mmdetection/blob/main/LICENSE"
+    },
+    "rtmpose-m-halpe26": {
+      "role": "pose",
+      "family": "RTMPose-m",
+      "keypointSet": "halpe26",
+      "inputSize": [192, 256],
+      "url": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip",
+      "zipSha256": "55b81170e236040b59fc792ad0a8315301ac4c079a3bdb1095d838aad3088d18",
+      "onnxRelative": "20230831/rtmpose_onnx/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605/end2end.onnx",
+      "onnxSha256": "26f3a19e61304a600dfb82d1001d41d24343b89fc70a33ffc84657e0b0bf2ecf",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/open-mmlab/mmpose/blob/main/LICENSE",
+      "simccSplitRatio": 2,
+      "mean": [123.675, 116.28, 103.53],
+      "std": [58.395, 57.12, 57.375]
+    }
+  }
+}
