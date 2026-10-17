@@ -202,7 +202,7 @@ export const messages: Record<string, string> = {
   'review.reject': 'Reject',
   'review.restore': 'Restore',
   'review.origin.detector': 'detected',
-  'review.origin.split': 'split',
+  'review.origin.edited': 'edited',
   'review.origin.merged': 'merged',
   'review.origin.manual': 'added',
   'review.status.rejected': 'rejected',

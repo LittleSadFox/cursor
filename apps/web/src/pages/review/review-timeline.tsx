@@ -101,15 +101,14 @@ function RangeBlock({
   const editable = row.status === 'draft';
   return (
     <>
-      <div className="review-pad" style={rangeStyle(clipOf(row, durationUs), durationUs)} />
+      {row.status === 'rejected' ? null : (
+        <div className="review-pad" style={rangeStyle(clipOf(row, durationUs), durationUs)} />
+      )}
       <div
         className={`review-climb review-climb-${row.status}`}
         data-selected={selected}
         style={rangeStyle(row.climb, durationUs)}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect(row.id);
-        }}
+        onPointerDown={() => onSelect(row.id)}
       />
       {selected && editable ? (
         <>
@@ -122,15 +121,20 @@ function RangeBlock({
 }
 
 /**
- * ProposalTimeline (BUILD_PLAN §6): filmstrip, shaded padding, climb ranges, and handles on
- * the selected climb. Click the track to seek; drag a handle to move that edge.
+ * ProposalTimeline (BUILD_PLAN §6): filmstrip, shaded padding, climb ranges (rejected ones faded
+ * underneath), and handles on
+ * the selected climb. Click the track to seek (on a climb, also select it); drag a handle to
+ * move that edge.
  */
 export function ReviewTimeline(props: TimelineProps) {
   const { i18n } = useLingui();
   const trackRef = useRef<HTMLDivElement | null>(null);
   const { rows, durationUs, currentUs, selectedId, filmstrip, onSeek, onSelect, onDragEdge } =
     props;
-  const live = rows.filter((row) => row.status !== 'rejected');
+  const ordered = [
+    ...rows.filter((row) => row.status === 'rejected'),
+    ...rows.filter((row) => row.status !== 'rejected'),
+  ];
   return (
     <div
       ref={trackRef}
@@ -148,7 +152,7 @@ export function ReviewTimeline(props: TimelineProps) {
       }}
     >
       {filmstrip ? <Filmstrip sprite={filmstrip} /> : null}
-      {live.map((row) => (
+      {ordered.map((row) => (
         <RangeBlock
           key={row.id}
           row={row}

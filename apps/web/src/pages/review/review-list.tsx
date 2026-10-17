@@ -18,7 +18,7 @@ export type ListActions = {
 function originLabel(row: DraftRow): string {
   if (row.parentIds.length === 0) return 'review.origin.manual';
   if (row.parentIds.length > 1) return 'review.origin.merged';
-  return row.parentIds[0] === row.id ? 'review.origin.detector' : 'review.origin.split';
+  return row.parentIds[0] === row.id ? 'review.origin.detector' : 'review.origin.edited';
 }
 
 function ItemActions({

@@ -20,6 +20,11 @@ type LoupeProps = {
   onPick: (tUs: number) => void;
 };
 
+/** Scrolls only the strip, so picking a climb never moves the page. */
+function centeredScroll(strip: HTMLElement, tile: HTMLElement): number {
+  return tile.offsetLeft - (strip.clientWidth - tile.offsetWidth) / 2;
+}
+
 /**
  * HandleLoupe (BUILD_PLAN §6): every frame around the active handle. Picking a frame moves
  * that handle to it exactly.
@@ -29,10 +34,13 @@ export function ReviewLoupe({ row, edge, sprite, loading, onEdge, onPick }: Loup
   const atUs = edge === 'start' ? row.climb.startUs : row.climb.endUs;
   const current = sprite ? nearestTile(sprite.tiles, atUs) : undefined;
   const currentRef = useRef<HTMLButtonElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const editable = row.status === 'draft';
 
   useEffect(() => {
-    currentRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const strip = stripRef.current;
+    const tile = currentRef.current;
+    if (strip && tile) strip.scrollLeft = centeredScroll(strip, tile);
   }, [current?.tUs, sprite]);
 
   return (
@@ -56,7 +64,7 @@ export function ReviewLoupe({ row, edge, sprite, loading, onEdge, onPick }: Loup
       </div>
       {loading ? <p className="lede">{i18n._('review.loupeLoading')}</p> : null}
       {sprite ? (
-        <div className="review-loupe-strip">
+        <div ref={stripRef} className="review-loupe-strip">
           {sprite.tiles.map((tile) => (
             <button
               key={tile.tUs}
