@@ -113,6 +113,9 @@ export const messages: Record<string, string> = {
   'recordings.title': 'Recordings',
   'recordings.lede':
     'Import a video that is already on this computer. The app probes it, hashes it, builds an H.264 playback proxy, and can cut a clip.',
+  'recordings.checkingFfmpeg': 'Checking the local ffmpeg build…',
+  'recordings.ffmpegMissing':
+    'Recording import needs the Apple Silicon LGPL ffmpeg build. From the repo root run ./scripts/ffmpeg/build-macos-arm64.sh, then restart the API server (Ctrl+C, then pnpm --filter @climbing-coach/server dev). You can also set COACH_FFMPEG and COACH_FFPROBE to those binaries.',
   'recordings.upload': 'Upload a file',
   'recordings.uploading': 'Uploading…',
   'recordings.path': 'Or import by absolute path',

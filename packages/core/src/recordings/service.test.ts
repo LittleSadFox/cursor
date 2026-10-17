@@ -79,10 +79,18 @@ describe('recording import', () => {
       ids: createIdGen(clock, sequentialRandomBytes(1)),
       events: createEventBus(() => clock.nowMs()),
       logger: silentLogger(),
+      // Pose stays out of this slice; health is degraded while ffmpeg can still import.
+      ffmpegAvailable: true,
+      ffmpegVersion: '8.1.3',
+      poseAvailable: false,
       video: tools(),
       mediaFiles: files(),
       mediaUrl: (id, variant) => `/api/v1/media/videos/${id}?variant=${variant}&sig=test`,
     });
+    const health = await api.system.health();
+    expect(health.status).toBe('degraded');
+    expect(health.ffmpeg.available).toBe(true);
+    expect(health.pose.available).toBe(false);
     const imported = await api.recordings.importPath({
       sourcePath: '/tmp/climb.mov',
       importMode: 'copy',

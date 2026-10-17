@@ -5,7 +5,8 @@ import type { CutMode, Recording } from '@climbing-coach/api';
 
 import { uploadRecording } from '../api.js';
 import { errorText, translate } from '../format.js';
-import { useImportPath, useCutRecording, useRecordings } from '../hooks/queries.js';
+import { useCutRecording, useHealth, useImportPath, useRecordings } from '../hooks/queries.js';
+import { recordingsImportReady } from './recordings-gate.js';
 import {
   formatDuration,
   formatFps,
@@ -23,7 +24,7 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RecordingDetail({ recording }: { recording: Recording }) {
+function RecordingDetail({ recording, canCut }: { recording: Recording; canCut: boolean }) {
   const { i18n } = useLingui();
   const cut = useCutRecording();
   const [start, setStart] = useState('0');
@@ -90,52 +91,59 @@ function RecordingDetail({ recording }: { recording: Recording }) {
       ) : (
         <p>{i18n._('recordings.proxyWait')}</p>
       )}
-      <form
-        className="cut-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const startUs = secondsToUs(Number(start));
-          const endUs = secondsToUs(Number(end));
-          if (startUs === null || endUs === null || endUs <= startUs) return;
-          cut.mutate({ id: recording.id, startUs, endUs, mode });
-        }}
-      >
-        <h3>{i18n._('recordings.cut')}</h3>
-        <label>
-          {i18n._('recordings.cutStart')}
-          <input
-            value={start}
-            onChange={(event) => setStart(event.target.value)}
-            inputMode="decimal"
-          />
-        </label>
-        <label>
-          {i18n._('recordings.cutEnd')}
-          <input value={end} onChange={(event) => setEnd(event.target.value)} inputMode="decimal" />
-        </label>
-        <label>
-          {i18n._('recordings.cutMode')}
-          <select value={mode} onChange={(event) => setMode(event.target.value as CutMode)}>
-            <option value="auto">auto</option>
-            <option value="lossless">lossless</option>
-            <option value="reencode">reencode</option>
-          </select>
-        </label>
-        <button type="submit" disabled={cut.isPending || recording.durationUs === null}>
-          {cut.isPending ? i18n._('recordings.cutting') : i18n._('recordings.cutSubmit')}
-        </button>
-        {cut.error ? (
-          <p className="error" role="alert">
-            {errorText(cut.error, i18n._('error.generic'))}
-          </p>
-        ) : null}
-      </form>
+      {canCut ? (
+        <form
+          className="cut-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const startUs = secondsToUs(Number(start));
+            const endUs = secondsToUs(Number(end));
+            if (startUs === null || endUs === null || endUs <= startUs) return;
+            cut.mutate({ id: recording.id, startUs, endUs, mode });
+          }}
+        >
+          <h3>{i18n._('recordings.cut')}</h3>
+          <label>
+            {i18n._('recordings.cutStart')}
+            <input
+              value={start}
+              onChange={(event) => setStart(event.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+          <label>
+            {i18n._('recordings.cutEnd')}
+            <input
+              value={end}
+              onChange={(event) => setEnd(event.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+          <label>
+            {i18n._('recordings.cutMode')}
+            <select value={mode} onChange={(event) => setMode(event.target.value as CutMode)}>
+              <option value="auto">auto</option>
+              <option value="lossless">lossless</option>
+              <option value="reencode">reencode</option>
+            </select>
+          </label>
+          <button type="submit" disabled={cut.isPending || recording.durationUs === null}>
+            {cut.isPending ? i18n._('recordings.cutting') : i18n._('recordings.cutSubmit')}
+          </button>
+          {cut.error ? (
+            <p className="error" role="alert">
+              {errorText(cut.error, i18n._('error.generic'))}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
     </section>
   );
 }
 
 export function RecordingsPage() {
   const { i18n } = useLingui();
+  const health = useHealth();
   const recordings = useRecordings();
   const importPath = useImportPath();
   const [path, setPath] = useState('');
@@ -144,61 +152,72 @@ export function RecordingsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const items = recordings.data ?? [];
   const current = items.find((item) => item.id === selected) ?? items[0] ?? null;
+  const importReady = health.data ? recordingsImportReady(health.data) : false;
 
   return (
     <div className="recordings">
       <section className="panel">
         <h1>{i18n._('recordings.title')}</h1>
         <p className="lede">{i18n._('recordings.lede')}</p>
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const input = event.currentTarget.elements.namedItem('file');
-            const file = input instanceof HTMLInputElement ? input.files?.[0] : undefined;
-            if (!file) return;
-            setUploading(true);
-            setUploadError(null);
-            try {
-              const created = await uploadRecording(file);
-              setSelected(created.recording.id);
-              await recordings.refetch();
-            } catch (error) {
-              setUploadError(errorText(error, i18n._('error.generic')));
-            } finally {
-              setUploading(false);
-            }
-          }}
-        >
-          <label>
-            {i18n._('recordings.upload')}
-            <input name="file" type="file" accept="video/*,.mov,.mp4,.m4v" />
-          </label>
-          <button type="submit" disabled={uploading}>
-            {uploading ? i18n._('recordings.uploading') : i18n._('recordings.upload')}
-          </button>
-        </form>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!path.startsWith('/')) return;
-            importPath.mutate(
-              { sourcePath: path, importMode: 'copy' },
-              { onSuccess: (created) => setSelected(created.recording.id) },
-            );
-          }}
-        >
-          <label>
-            {i18n._('recordings.path')}
-            <input
-              value={path}
-              onChange={(event) => setPath(event.target.value)}
-              placeholder="/Users/…"
-            />
-          </label>
-          <button type="submit" disabled={importPath.isPending}>
-            {i18n._('recordings.import')}
-          </button>
-        </form>
+        {health.isLoading ? <p>{i18n._('recordings.checkingFfmpeg')}</p> : null}
+        {health.data && !importReady ? (
+          <p className="status" role="status">
+            {i18n._('recordings.ffmpegMissing')}
+          </p>
+        ) : null}
+        {importReady ? (
+          <>
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const input = event.currentTarget.elements.namedItem('file');
+                const file = input instanceof HTMLInputElement ? input.files?.[0] : undefined;
+                if (!file) return;
+                setUploading(true);
+                setUploadError(null);
+                try {
+                  const created = await uploadRecording(file);
+                  setSelected(created.recording.id);
+                  await recordings.refetch();
+                } catch (error) {
+                  setUploadError(errorText(error, i18n._('error.generic')));
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            >
+              <label>
+                {i18n._('recordings.upload')}
+                <input name="file" type="file" accept="video/*,.mov,.mp4,.m4v" />
+              </label>
+              <button type="submit" disabled={uploading}>
+                {uploading ? i18n._('recordings.uploading') : i18n._('recordings.upload')}
+              </button>
+            </form>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!path.startsWith('/')) return;
+                importPath.mutate(
+                  { sourcePath: path, importMode: 'copy' },
+                  { onSuccess: (created) => setSelected(created.recording.id) },
+                );
+              }}
+            >
+              <label>
+                {i18n._('recordings.path')}
+                <input
+                  value={path}
+                  onChange={(event) => setPath(event.target.value)}
+                  placeholder="/Users/…"
+                />
+              </label>
+              <button type="submit" disabled={importPath.isPending}>
+                {i18n._('recordings.import')}
+              </button>
+            </form>
+          </>
+        ) : null}
         {uploadError || importPath.error ? (
           <p className="error" role="alert">
             {uploadError ?? errorText(importPath.error, i18n._('error.generic'))}
@@ -220,7 +239,9 @@ export function RecordingsPage() {
           ))}
         </ul>
       </section>
-      {current ? <RecordingDetail key={current.id} recording={current} /> : null}
+      {current ? (
+        <RecordingDetail key={current.id} recording={current} canCut={importReady} />
+      ) : null}
     </div>
   );
 }

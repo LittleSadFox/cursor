@@ -81,7 +81,7 @@ export function createRecordingService(deps: RecordingDeps) {
     if (!deps.video?.ready() || !deps.files) {
       throw new ProblemError(
         'FFMPEG_UNAVAILABLE',
-        'ffmpeg is not available. On Apple Silicon build it with scripts/ffmpeg/build-macos-arm64.sh or set COACH_FFMPEG.',
+        'ffmpeg is not available. On Apple Silicon run ./scripts/ffmpeg/build-macos-arm64.sh, restart the server, or set COACH_FFMPEG and COACH_FFPROBE.',
       );
     }
     return { video: deps.video, files: deps.files };

@@ -15,6 +15,10 @@ export function useSettings() {
   return useQuery({ queryKey: ['settings'], queryFn: () => api.system.getSettings() });
 }
 
+export function useHealth() {
+  return useQuery({ queryKey: ['health'], queryFn: () => api.system.health() });
+}
+
 export function useToday(date = localDate()) {
   return useQuery({ queryKey: ['training-log', date], queryFn: () => api.trainingLogs.get(date) });
 }
