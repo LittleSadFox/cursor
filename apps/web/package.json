@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ../../scripts/ensure-built.mjs && vite",
+    "dev": "node ../../scripts/build-workspace-deps.mjs @climbing-coach/web && vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
