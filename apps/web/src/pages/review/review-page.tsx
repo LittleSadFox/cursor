@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLingui } from '@lingui/react';
 import { Link } from '@tanstack/react-router';
 
@@ -15,6 +16,7 @@ import {
   useReviewState,
   useSelectTrack,
 } from '../../hooks/queries.js';
+import { RecordingSkeletonOverlay } from '../recording-skeleton.js';
 import { ActivityLane } from './activity-lane.js';
 import { isLive } from './draft.js';
 import { canRedo, canUndo, isDirty } from './history.js';
@@ -57,6 +59,8 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
   const tracks = usePoseTracks(recording.id, ready);
   const selectTrack = useSelectTrack(recording.id);
   const catalog = useReviewCatalog();
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const selectedTrack = tracks.data?.tracks.find((track) => track.selected)?.trackId ?? null;
   const filmstrip = useFilmstrip(recording.id, filmstripQuery(review, durationUs));
   const { selected, edge } = editor;
   const edgeUs = selected
@@ -78,8 +82,26 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
       ) : null}
       {notice ? <p className="status">{i18n._(notice)}</p> : null}
       {recording.proxyUrl ? (
-        <div className="player-stage">
-          <video ref={player.videoRef} className="player" src={recording.proxyUrl} preload="auto" />
+        <div className="review-player">
+          <button type="button" className="ghost" onClick={() => setShowSkeleton((on) => !on)}>
+            {i18n._(showSkeleton ? 'review.skeleton.hide' : 'review.skeleton.show')}
+          </button>
+          <div className="player-stage">
+            <video
+              ref={player.videoRef}
+              className="player"
+              src={recording.proxyUrl}
+              preload="auto"
+            />
+            {showSkeleton ? (
+              <RecordingSkeletonOverlay
+                videoId={recording.id}
+                hasPose={recording.hasPose}
+                videoRef={player.videoRef}
+                trackId={selectedTrack}
+              />
+            ) : null}
+          </div>
         </div>
       ) : (
         <p>{i18n._('recordings.proxyWait')}</p>

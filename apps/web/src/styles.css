@@ -481,6 +481,11 @@ button:disabled {
   gap: 1rem;
 }
 
+.review-player {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .review .player-stage {
   max-height: 55vh;
 }

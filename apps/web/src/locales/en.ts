@@ -217,6 +217,8 @@ export const messages: Record<string, string> = {
   'review.activity.threshold': 'Threshold',
   'review.activity.hip': 'Hip speed',
   'review.activity.onWall': 'On wall',
+  'review.skeleton.show': 'Show skeleton',
+  'review.skeleton.hide': 'Hide skeleton',
   'review.track': 'Wrong climber?',
   'review.track.person': 'Climber {n}: {start}–{end} s',
   'review.mergeNext': 'Merge with next',
