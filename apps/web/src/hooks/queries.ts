@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   CutMode,
-  Recording,
+  FilmstripQuery,
   RecordingImport,
+  ReprocessScope,
+  ReviewState,
   SettingsPatch,
   TrainingLogInput,
   TrashKind,
@@ -107,17 +109,60 @@ export function useImportPath() {
   });
 }
 
-/**
- * The job status is part of the key, so the list refetches once more when the import
- * job settles. Polling alone would stop before the final `propose` step lands.
- */
-export function useReviewItems(recording: Pick<Recording, 'id' | 'kind' | 'jobStatus'>) {
+export function useRecording(id: string) {
   return useQuery({
-    queryKey: ['recordings', recording.id, 'review', recording.jobStatus],
-    queryFn: () => api.recordings.review(recording.id),
-    enabled: recording.kind === 'original',
-    refetchInterval: jobBusy(recording.jobStatus) ? 1500 : false,
+    queryKey: ['recordings', id],
+    queryFn: () => api.recordings.get(id),
+    refetchInterval: (query) => (jobBusy(query.state.data?.jobStatus ?? null) ? 1500 : false),
   });
+}
+
+export function reviewKey(id: string) {
+  return ['recordings', id, 'review'] as const;
+}
+
+/** Polls while import or reprocess may still add proposals. */
+export function useReviewState(id: string, enabled = true) {
+  return useQuery({
+    queryKey: reviewKey(id),
+    queryFn: () => api.review.get(id),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.processing.complete === false ? 1500 : false),
+  });
+}
+
+export function useReprocess(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (scope: ReprocessScope) => api.recordings.reprocess(id, { scope }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['recordings'] });
+    },
+  });
+}
+
+/** Frame sprites change only when the proxy does, so they never go stale. */
+export function useFilmstrip(id: string, query: FilmstripQuery | null) {
+  return useQuery({
+    queryKey: ['recordings', id, 'filmstrip', query],
+    queryFn: () => api.recordings.filmstrip(id, query as FilmstripQuery),
+    enabled: query !== null,
+    staleTime: Infinity,
+  });
+}
+
+export function useLoupe(id: string, atUs: number | null) {
+  return useQuery({
+    queryKey: ['recordings', id, 'loupe', atUs],
+    queryFn: () => api.recordings.loupe(id, atUs ?? 0),
+    enabled: atUs !== null,
+    staleTime: Infinity,
+  });
+}
+
+export function useSetReviewState() {
+  const client = useQueryClient();
+  return (state: ReviewState) => client.setQueryData(reviewKey(state.recordingId), state);
 }
 
 export function useCutRecording() {

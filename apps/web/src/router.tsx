@@ -6,6 +6,7 @@ import { compareSearch } from './pages/compare/search.js';
 import { HomePage } from './pages/home.js';
 import { PlaceholderPage } from './pages/placeholder.js';
 import { RecordingsPage } from './pages/recordings.js';
+import { ReviewPage } from './pages/review/review-page.js';
 import { SettingsPage } from './pages/settings.js';
 import { SetupPage } from './pages/setup.js';
 import { TrashPage } from './pages/trash.js';
@@ -55,6 +56,15 @@ const recordingsRoute = createRoute({
   component: RecordingsPage,
 });
 
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recordings/$id/review',
+  component: function ReviewRoute() {
+    const { id } = reviewRoute.useParams();
+    return <ReviewPage key={id} id={id} />;
+  },
+});
+
 const compareRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/compare',
@@ -71,6 +81,7 @@ const routeTree = rootRoute.addChildren([
   trashRoute,
   libraryRoute,
   recordingsRoute,
+  reviewRoute,
   compareRoute,
 ]);
 

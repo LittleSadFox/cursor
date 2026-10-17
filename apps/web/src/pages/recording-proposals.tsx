@@ -1,8 +1,9 @@
 import type { Recording, ReviewItem } from '@climbing-coach/api';
 import { useLingui } from '@lingui/react';
+import { Link } from '@tanstack/react-router';
 
 import { errorText, translate } from '../format.js';
-import { useCutRecording, useReviewItems } from '../hooks/queries.js';
+import { useCutRecording, useReviewState } from '../hooks/queries.js';
 import { proposalNotice, visibleProposals } from './recording-proposals-state.js';
 
 function seconds(us: number): string {
@@ -25,8 +26,8 @@ function ProposalRow({
     <li>
       <span>
         {translate(i18n, 'recordings.proposalRange', {
-          start: seconds(item.climbStartUs),
-          end: seconds(item.climbEndUs),
+          start: seconds(item.climb.startUs),
+          end: seconds(item.climb.endUs),
           outcome: i18n._(`recordings.outcome.${item.outcome}`),
         })}
       </span>
@@ -48,15 +49,20 @@ export function RecordingProposals({
   canCut: boolean;
 }) {
   const { i18n } = useLingui();
-  const review = useReviewItems(recording);
+  const review = useReviewState(recording.id, recording.kind === 'original');
   const cut = useCutRecording();
   if (recording.kind !== 'original') return null;
-  const items = visibleProposals(review.data ?? []);
+  const items = visibleProposals(review.data?.items ?? []);
   const notice = proposalNotice(recording, items.length);
 
   return (
     <section>
       <h3>{i18n._('recordings.proposals')}</h3>
+      <p>
+        <Link to="/recordings/$id/review" params={{ id: recording.id }}>
+          {i18n._('recordings.openReview')}
+        </Link>
+      </p>
       {recording.warnings.includes('camera_moving') ? (
         <p className="status">{i18n._('recordings.warning.camera_moving')}</p>
       ) : null}
@@ -72,8 +78,8 @@ export function RecordingProposals({
               onCut={(picked) =>
                 cut.mutate({
                   id: recording.id,
-                  startUs: picked.clipStartUs,
-                  endUs: picked.clipEndUs,
+                  startUs: picked.clip.startUs,
+                  endUs: picked.clip.endUs,
                   mode: 'auto',
                 })
               }

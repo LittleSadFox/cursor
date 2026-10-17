@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@climbing-coach/api": "workspace:*",
+    "@climbing-coach/engine": "workspace:*",
     "@climbing-coach/schema": "workspace:*",
     "@lingui/core": "^6.9.1",
     "@lingui/message-utils": "^6.9.1",
