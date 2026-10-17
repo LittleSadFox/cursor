@@ -1,6 +1,7 @@
 import {
   mergeDetectorUpdate,
   proposeItems,
+  rangesOverlap,
   type AttemptDetection,
   type DraftItem,
 } from '@climbing-coach/engine';
@@ -41,13 +42,22 @@ function heldDraft(row: ReviewItemRow, incoming: readonly DraftItem[]): DraftIte
   };
 }
 
+/** A span the user rejected is not proposed again by a later detection pass. */
+function outsideRejected(rows: readonly ReviewItemRow[], item: DraftItem): boolean {
+  return !rows.some(
+    (row) =>
+      row.status === 'rejected' &&
+      rangesOverlap({ startUs: row.climbStartUs, endUs: row.climbEndUs }, item.climb),
+  );
+}
+
 /** What to retire and insert so the stored draft reflects `attempts` (engine `mergeDetectorUpdate`). */
 export function planDetectorUpdate(
   existing: readonly ReviewItemRow[],
   attempts: readonly AttemptDetection[],
   newIds: readonly string[],
 ): DetectorPlan {
-  const incoming = proposeItems(attempts, newIds);
+  const incoming = proposeItems(attempts, newIds).filter((item) => outsideRejected(existing, item));
   const current = existing.map((row) => heldDraft(row, incoming));
   const merged = mergeDetectorUpdate(current, incoming);
   const keptIds = new Set(merged.map((item) => item.id));

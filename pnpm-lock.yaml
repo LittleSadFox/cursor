@@ -104,6 +104,9 @@ importers:
       '@climbing-coach/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@climbing-coach/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@climbing-coach/schema':
         specifier: workspace:*
         version: link:../../packages/schema

@@ -21,6 +21,8 @@ export function RecordingSkeletonOverlay(props: {
   videoId: string;
   hasPose: boolean;
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** Changes when the user picks another person, so the overlay follows that track. */
+  trackId?: string | null;
 }) {
   const { i18n } = useLingui();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,7 +50,7 @@ export function RecordingSkeletonOverlay(props: {
     return () => {
       cancelled = true;
     };
-  }, [props.videoId, props.hasPose, i18n]);
+  }, [props.videoId, props.hasPose, props.trackId, i18n]);
 
   useEffect(() => {
     const video = props.videoRef.current;

@@ -45,6 +45,19 @@ export const CUT_PIPELINE: Pipeline = {
   ],
 };
 
+/**
+ * BUILD_PLAN §3.3 `reprocess`: `full` poses the whole recording again (the activity pass
+ * missed a climb); `active` re-detects on the stored track. Proposals merge into the draft
+ * without touching user-edited items.
+ */
+export const REPROCESS_PIPELINE: Pipeline = {
+  type: 'reprocess-recording',
+  steps: [
+    { name: 'pose-detection', resource: 'pose', dependsOn: [] },
+    { name: 'propose', resource: 'compute', dependsOn: ['pose-detection'] },
+  ],
+};
+
 export const P2A_PIPELINES: readonly Pipeline[] = [BACKUP_PIPELINE, PURGE_PIPELINE];
 
 export const CORE_PIPELINES: readonly Pipeline[] = [
@@ -52,4 +65,5 @@ export const CORE_PIPELINES: readonly Pipeline[] = [
   COMPARE_PIPELINE,
   IMPORT_PIPELINE,
   CUT_PIPELINE,
+  REPROCESS_PIPELINE,
 ];

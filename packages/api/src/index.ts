@@ -1,5 +1,19 @@
 export { API_VERSION } from './version.js';
 export {
+  ActivityEnergySchema,
+  ActivityHipSchema,
+  ActivityTrackSchema,
+  PosePeopleSchema,
+  PosePersonSchema,
+  SelectPoseTrackSchema,
+  type ActivityEnergy,
+  type ActivityHip,
+  type ActivityTrack,
+  type PosePeople,
+  type PosePerson,
+  type SelectPoseTrack,
+} from './activity.js';
+export {
   HealthResponseSchema,
   RuntimeStatusSchema,
   defaultHealth,
@@ -166,7 +180,46 @@ export {
   type RecordingImport,
 } from './recordings.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
-export { ReviewItemSchema, type ReviewItem } from './review.js';
+export {
+  ExertionSchema,
+  FilmstripQuerySchema,
+  LoupeQuerySchema,
+  NEW_REVIEW_ITEM_ID,
+  ProximitySchema,
+  RecordingReprocessSchema,
+  ReprocessScopeSchema,
+  ReviewItemInputSchema,
+  ReviewItemSchema,
+  ReviewOriginSchema,
+  ReviewPaddingSchema,
+  ReviewProcessingSchema,
+  ReviewRangeSchema,
+  ReviewRatingSchema,
+  ReviewSavedSchema,
+  ReviewSaveSchema,
+  ReviewStateSchema,
+  ReviewStatusSchema,
+  ReviewTagsSchema,
+  SpriteSchema,
+  SpriteTileSchema,
+  type FilmstripQuery,
+  type LoupeQuery,
+  type RecordingReprocess,
+  type ReprocessScope,
+  type ReviewItem,
+  type ReviewItemInput,
+  type ReviewOrigin,
+  type ReviewPadding,
+  type ReviewProcessing,
+  type ReviewRange,
+  type ReviewRating,
+  type ReviewSave,
+  type ReviewSaved,
+  type ReviewState,
+  type ReviewStatus,
+  type Sprite,
+  type SpriteTile,
+} from './review.js';
 export type { CoachApi, Crud } from './coach-api.js';
 export {
   createHttpCoachApi,

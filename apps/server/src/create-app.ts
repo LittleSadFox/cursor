@@ -17,6 +17,7 @@ export type CreateAppOptions = {
   mediaSecret: string;
   libraryRoot: string | null;
   resolveMedia?: MediaOptions['resolveMedia'];
+  resolveThumb?: MediaOptions['resolveThumb'];
   logger?: boolean;
   heartbeatMs?: number;
 };
@@ -28,6 +29,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerRoutes(app, options.api, {
     mediaSecret: options.mediaSecret,
     resolveMedia: options.resolveMedia,
+    resolveThumb: options.resolveThumb,
   });
   registerEvents(app, {
     events: options.events,

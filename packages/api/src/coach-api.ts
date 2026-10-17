@@ -1,3 +1,4 @@
+import type { ActivityTrack, PosePeople, SelectPoseTrack } from './activity.js';
 import type {
   Boulder,
   BoulderInput,
@@ -18,7 +19,14 @@ import type { Gym, GymInput, GymListQuery, GymPatch } from './gyms.js';
 import type { HealthResponse } from './health.js';
 import type { Job, JobQuery } from './jobs.js';
 import type { Recording, RecordingAccepted, RecordingCut, RecordingImport } from './recordings.js';
-import type { ReviewItem } from './review.js';
+import type {
+  FilmstripQuery,
+  RecordingReprocess,
+  ReviewSave,
+  ReviewSaved,
+  ReviewState,
+  Sprite,
+} from './review.js';
 import type { Session, SessionInput, SessionListQuery, SessionPatch } from './sessions.js';
 import type { Settings, SettingsPatch } from './settings.js';
 import type {
@@ -98,8 +106,23 @@ export type CoachApi = {
     /** Copy, move, or reference a file already on disk. Returns before probe and proxy finish. */
     importPath(input: RecordingImport): Promise<RecordingAccepted>;
     cut(id: Id, input: RecordingCut): Promise<RecordingAccepted>;
-    /** Detector proposals for one recording, oldest climb first. */
-    review(id: Id): Promise<ReviewItem[]>;
+    /** `full` poses the whole recording again (activity missed a climb); `active` re-detects only. */
+    reprocess(id: Id, input: RecordingReprocess): Promise<RecordingAccepted>;
+    filmstrip(id: Id, q: FilmstripQuery): Promise<Sprite>;
+    /** Every frame within ±1.5 s of `atUs`, for frame-exact handle placement. */
+    loupe(id: Id, atUs: number): Promise<Sprite>;
+  };
+  review: {
+    /** Draft items, oldest climb first, plus whether processing may still add proposals. */
+    get(recordingId: Id): Promise<ReviewState>;
+    /** Autosave. Rejects a stale `baseRevision` with `REVIEW_REVISION_CONFLICT`. */
+    save(recordingId: Id, input: ReviewSave): Promise<ReviewSaved>;
+    /** Energy, active windows, and hip speed for the review activity lane. */
+    activity(recordingId: Id): Promise<ActivityTrack>;
+    /** People in the detection posebin. Empty until pose has run. */
+    tracks(recordingId: Id): Promise<PosePeople>;
+    /** Use this person for detection and merge the new proposals into the draft. */
+    selectTrack(recordingId: Id, input: SelectPoseTrack): Promise<PosePeople>;
   };
   comparisons: {
     /** Cached result (`ready`) or a `pending` comparison carrying the `compare` job id. */

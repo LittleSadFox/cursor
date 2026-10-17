@@ -24,7 +24,14 @@ import {
   POSE_ID,
   type LocatedPoseModels,
 } from './models.js';
-import { openPoseSessions, runDetector, runPose, type OrtSessions } from './session.js';
+import {
+  openPoseSessions,
+  preferredProvider,
+  runDetector,
+  runPose,
+  type OpenOrtSession,
+  type OrtSessions,
+} from './session.js';
 import { decodeSimcc, simccToInputPixels } from './simcc.js';
 import { associateDetections, shouldRunDetector, type TrackedPerson } from './track.js';
 
@@ -50,11 +57,10 @@ export type NodePoseExtractorOptions = {
   platform?: NodeJS.Platform;
   arch?: string;
   detectorInterval?: number;
+  openSession?: OpenOrtSession;
 };
 
-export function createNodePoseExtractor(
-  options: NodePoseExtractorOptions = {},
-): PoseExtractor {
+export function createNodePoseExtractor(options: NodePoseExtractorOptions = {}): PoseExtractor {
   const located = options.located ?? locatePoseModels();
   let sessions: OrtSessions | null = null;
   let loading: Promise<OrtSessions> | null = null;
@@ -65,9 +71,10 @@ export function createNodePoseExtractor(
       throw new Error('Pose weights are not installed. Run scripts/pose/fetch-models.mjs.');
     }
     if (!loading) {
-      const sessionOpts: { platform?: NodeJS.Platform; arch?: string } = {};
+      const sessionOpts: Parameters<typeof openPoseSessions>[2] = {};
       if (options.platform !== undefined) sessionOpts.platform = options.platform;
       if (options.arch !== undefined) sessionOpts.arch = options.arch;
+      if (options.openSession !== undefined) sessionOpts.open = options.openSession;
       loading = openPoseSessions(located.detectorOnnx, located.poseOnnx, sessionOpts).then(
         (opened) => {
           sessions = opened;
@@ -85,8 +92,8 @@ export function createNodePoseExtractor(
       modelVersion: MODEL_VERSION,
       keypointSet: 'halpe26',
       executionProvider:
-        sessions?.executionProvider ??
-        (process.platform === 'darwin' && process.arch === 'arm64' ? 'coreml' : 'cpu'),
+        sessions?.executionProvider() ??
+        preferredProvider(options.platform ?? process.platform, options.arch ?? process.arch),
       inputSize: { width: POSE_W, height: POSE_H },
     };
   }

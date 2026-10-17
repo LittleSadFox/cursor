@@ -24,7 +24,7 @@ on `onnxruntime-node`, CoreML EP on macOS arm64, CPU elsewhere. No AGPL/GPL mode
 | Pose | RTMPose-m Halpe-26 (256×192 SimCC ONNX) | Apache-2.0 (MMPose / OpenMMLab) |
 | Detector | RTMDet-nano person (320×320 ONNX, baked-in NMS) | Apache-2.0 (MMDetection / OpenMMLab) |
 | Runtime | `onnxruntime-node` | MIT |
-| macOS arm64 EP | CoreMLExecutionProvider (CPU fallback if CoreML rejects the graph) | — |
+| macOS arm64 EP | RTMPose on CoreMLExecutionProvider (reopens on CPU if CoreML rejects the graph at load or run); RTMDet on CPU | — |
 | Linux CI EP | CPUExecutionProvider | — |
 
 Weights are fetched with checksum verification (`scripts/pose/fetch-models.mjs`); they are not
@@ -53,6 +53,9 @@ will not ship. YOLO-pose remains research-only (AGPL).
   until both ffmpeg and pose are ready.
 - Import jobs gain a `pose-detection` step (resource class `pose`) after probe, parallel with
   proxy; SSE `job.progress` already covers it.
+- RTMDet's baked-in NMS has a data-dependent output shape; the CoreML EP loads it but fails
+  at run time (static rank 5 vs inferred `[1, N]`), so the detector runs on CPU. It is the
+  nano model at 320² and runs every few frames, so the cost is small.
 - CoreML operator coverage and climbing PCK are still unproven on the private dataset — this
   ADR can move back to Proposed or change model if bake-off (P0.6) fails the gates.
 - Adapter boundary: `packages/adapters-node/src/pose` (later `adapters-native/pose`).

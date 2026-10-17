@@ -17,6 +17,8 @@ import type { PoseExtractor } from './ports/pose.js';
 import type { AppDatabase, SqlExecutor, SqliteBackup } from './ports/sql.js';
 import type { VideoTools } from './ports/video.js';
 import { createRecordingService } from './recordings/service.js';
+import { createSpriteService } from './recordings/sprites.js';
+import { createReviewService } from './review/service.js';
 import { createCatalogService } from './services/catalog.js';
 import { createComparisonService } from './services/comparisons.js';
 import { createStatsService } from './services/stats.js';
@@ -45,6 +47,8 @@ export type CoreDeps = {
   video?: VideoTools | undefined;
   mediaFiles?: MediaFiles | undefined;
   mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
+  /** Signed URL for a filmstrip or loupe JPEG under `thumbs/<videoId>/`. */
+  thumbUrl?: ((videoId: string, name: string) => string) | undefined;
   cpuCores?: number;
   onLibraryRootChange?: (root: string | null) => void;
 };
@@ -53,6 +57,7 @@ export type CoreDeps = {
 export function createCoreApi(deps: CoreDeps): CoachApi & {
   jobsRunner: JobRunner;
   resolveMedia: ReturnType<typeof createRecordingService>['mediaFile'];
+  resolveThumb: ReturnType<typeof createSpriteService>['thumbFile'];
 } {
   const { db, clock } = deps;
   seedFocusTags(db, clock);
@@ -86,6 +91,13 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
   const recovered = jobsRunner.recover();
   if (recovered > 0) deps.logger.warn({ recovered }, 'requeued job steps interrupted by a restart');
 
+  const sprites = createSpriteService({
+    db,
+    video: deps.video,
+    files: deps.mediaFiles,
+    blobs: deps.blobs,
+    thumbUrl: deps.thumbUrl,
+  });
   const recordings = createRecordingService({
     db,
     clock,
@@ -94,6 +106,8 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
     video: deps.video,
     files: deps.mediaFiles,
     mediaUrl: deps.mediaUrl,
+    sprites,
+    poseReady: () => deps.pose?.ready() === true,
   });
 
   return {
@@ -114,6 +128,13 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
     trash,
     videos: createVideoService({ db, blobs: deps.blobs }),
     recordings,
+    review: createReviewService({
+      db,
+      clock,
+      ids: deps.ids,
+      events: deps.events,
+      blobs: deps.blobs,
+    }),
     comparisons: createComparisonService({
       db,
       clock,
@@ -131,5 +152,6 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
     events: { subscribe: (handler) => deps.events.subscribe(handler) },
     jobsRunner,
     resolveMedia: recordings.mediaFile,
+    resolveThumb: sprites.thumbFile,
   };
 }

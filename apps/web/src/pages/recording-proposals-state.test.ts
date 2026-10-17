@@ -7,14 +7,19 @@ import { proposalNotice, visibleProposals } from './recording-proposals-state.js
 function item(status: ReviewItem['status']): ReviewItem {
   return {
     id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-    videoId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    origin: 'detector',
+    parentIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+    climb: { startUs: 0, endUs: 1 },
+    padding: { preUs: 0, postUs: 0 },
+    clip: { startUs: 0, endUs: 1 },
     outcome: 'fall',
-    climbStartUs: 0,
-    climbEndUs: 1,
-    clipStartUs: 0,
-    clipEndUs: 1,
     confidence: null,
+    touched: false,
     status,
+    boulderId: null,
+    proximity: null,
+    exertion: null,
+    tags: [],
   };
 }
 

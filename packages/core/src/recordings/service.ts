@@ -1,16 +1,16 @@
 import {
   ProblemError,
+  type FilmstripQuery,
   type Job,
   type Recording,
   type RecordingAccepted,
   type RecordingCut,
   type RecordingImport,
-  type ReviewItem,
+  type RecordingReprocess,
+  type Sprite,
 } from '@climbing-coach/api';
 
 import { findPoseTrack } from '../db/repos/attempts.js';
-import { getJob } from '../db/repos/jobs.js';
-import { listReviewItems } from '../db/repos/review.js';
 import { getVideo, insertVideo, listVideos, updateVideo } from '../db/repos/videos.js';
 import { parseWarningList } from '../ingest/warnings.js';
 import type { IdGen } from '../ids/ulid.js';
@@ -19,8 +19,9 @@ import type { Clock } from '../ports/clock.js';
 import type { MediaFiles } from '../ports/media-files.js';
 import type { AppDatabase } from '../ports/sql.js';
 import { VideoToolError, type VideoTools } from '../ports/video.js';
+import { jobActive, jobOf } from './job-of.js';
 import { contentTypeFor, fileBaseName } from './paths.js';
-import { toReviewItem } from './review-items.js';
+import type { createSpriteService } from './sprites.js';
 import type { videos } from '../db/schema.js';
 
 export type RecordingDeps = {
@@ -31,16 +32,9 @@ export type RecordingDeps = {
   video?: VideoTools | undefined;
   files?: MediaFiles | undefined;
   mediaUrl?: ((videoId: string, variant: 'original' | 'proxy') => string) | undefined;
+  sprites?: ReturnType<typeof createSpriteService> | undefined;
+  poseReady?: (() => boolean) | undefined;
 };
-
-function jobOf(db: AppDatabase, id: string | null): Job | null {
-  if (!id) return null;
-  try {
-    return getJob(db, id);
-  } catch {
-    return null;
-  }
-}
 
 function toRecording(
   db: AppDatabase,
@@ -87,6 +81,19 @@ function toRecording(
   };
 }
 
+/** Original, probed, and not mid-job: reprocessing would race the running pipeline. */
+function assertReprocessable(row: typeof videos.$inferSelect, job: Job | null): void {
+  if (row.kind !== 'original') {
+    throw new ProblemError('VALIDATION_FAILED', 'Only original recordings can be reprocessed.');
+  }
+  if (!row.path || row.durationUs === null) {
+    throw new ProblemError('VALIDATION_FAILED', 'Probe has not finished for this recording.');
+  }
+  if (jobActive(job?.status)) {
+    throw new ProblemError('VALIDATION_FAILED', 'This recording is still processing.');
+  }
+}
+
 export function createRecordingService(deps: RecordingDeps) {
   const tools = (): { video: VideoTools; files: MediaFiles } => {
     if (!deps.video?.ready() || !deps.files) {
@@ -96,6 +103,11 @@ export function createRecordingService(deps: RecordingDeps) {
       );
     }
     return { video: deps.video, files: deps.files };
+  };
+
+  const spriteService = () => {
+    if (!deps.sprites) throw new ProblemError('FFMPEG_UNAVAILABLE', 'Frame previews are off.');
+    return deps.sprites;
   };
 
   const present = (row: typeof videos.$inferSelect): Recording =>
@@ -217,13 +229,25 @@ export function createRecordingService(deps: RecordingDeps) {
       updateVideo(deps.db, clipId, { importJobId: job.id }, now);
       return { jobId: job.id, recording: present(getVideo(deps.db, clipId)) };
     },
-    async review(id: string): Promise<ReviewItem[]> {
-      const row = getVideo(deps.db, id);
-      const durationUs = row.durationUs ?? 0;
-      return listReviewItems(deps.db, id).flatMap((item) => {
-        const mapped = toReviewItem(item, durationUs);
-        return mapped ? [mapped] : [];
-      });
+    async reprocess(id: string, input: RecordingReprocess): Promise<RecordingAccepted> {
+      tools();
+      const source = getVideo(deps.db, id);
+      assertReprocessable(source, jobOf(deps.db, source.importJobId));
+      if (input.scope === 'full' && deps.poseReady?.() !== true) {
+        throw new ProblemError(
+          'POSE_RUNTIME_UNAVAILABLE',
+          'Pose weights are not loaded. Run node scripts/pose/fetch-models.mjs and restart.',
+        );
+      }
+      const job = deps.runner.enqueue('reprocess-recording', { videoId: id, scope: input.scope });
+      updateVideo(deps.db, id, { importJobId: job.id }, deps.clock.nowIso());
+      return { jobId: job.id, recording: present(getVideo(deps.db, id)) };
+    },
+    async filmstrip(id: string, q: FilmstripQuery): Promise<Sprite> {
+      return spriteService().filmstrip(id, q);
+    },
+    async loupe(id: string, atUs: number): Promise<Sprite> {
+      return spriteService().loupe(id, atUs);
     },
     async mediaFile(id: string, variant: 'original' | 'proxy') {
       if (!deps.files) throw new ProblemError('NOT_FOUND', 'library files are not configured');

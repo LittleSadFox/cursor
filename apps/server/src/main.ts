@@ -28,6 +28,7 @@ import {
 
 import { launchConfig, resolveLibraryRoot } from './config.js';
 import { createApp } from './create-app.js';
+import { thumbVariant } from './routes/media.js';
 import { startScheduler } from './scheduler.js';
 
 const consoleLogger: Logger = {
@@ -72,6 +73,8 @@ async function main(): Promise<void> {
   const mediaFiles = libraryMediaFiles(libraryRoot);
   const mediaUrl = (videoId: string, variant: 'original' | 'proxy') =>
     `/api/v1/media/videos/${videoId}?variant=${variant}&sig=${signMedia(config.mediaSecret, videoId, variant)}`;
+  const thumbUrl = (videoId: string, name: string) =>
+    `/api/v1/media/thumbs/${videoId}/${name}?sig=${signMedia(config.mediaSecret, videoId, thumbVariant(name))}`;
   const api = createCoreApi({
     db: opened.db,
     sql: opened.sql,
@@ -91,6 +94,7 @@ async function main(): Promise<void> {
     video,
     mediaFiles,
     mediaUrl,
+    thumbUrl,
     onLibraryRootChange: (root) => {
       if (persistLibraryRoot) writeLibraryPointer(configDir, root);
     },
@@ -110,6 +114,7 @@ async function main(): Promise<void> {
     mediaSecret: config.mediaSecret,
     libraryRoot,
     resolveMedia: api.resolveMedia,
+    resolveThumb: api.resolveThumb,
     logger: true,
   });
   const stopScheduler = startScheduler(api.jobsRunner, consoleLogger);

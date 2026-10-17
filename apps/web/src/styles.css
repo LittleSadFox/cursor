@@ -474,3 +474,280 @@ button:disabled {
 .api-down code {
   font-size: 0.9em;
 }
+
+.review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.review-player {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.review .player-stage {
+  max-height: 55vh;
+}
+
+.review .player {
+  max-height: 55vh;
+}
+
+.review a {
+  color: var(--accent);
+}
+
+.review-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.review-clock {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 9rem;
+}
+
+.review-track {
+  position: relative;
+  min-height: 4.5rem;
+  background: #0b1411;
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.review-filmstrip {
+  display: flex;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.review-filmstrip-tile {
+  flex: 1 1 0;
+  min-width: 0;
+  background-repeat: no-repeat;
+}
+
+.review-pad,
+.review-climb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.review-pad {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
+}
+
+.review-climb {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-left: 2px solid var(--accent);
+  border-right: 2px solid var(--accent);
+}
+
+.review-climb[data-selected='true'] {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.review-climb.review-climb-rejected {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in srgb, #f5a89a 25%, transparent) 6px 9px
+  );
+  border-color: color-mix(in srgb, #f5a89a 50%, transparent);
+  border-style: dashed;
+}
+
+.review-climb.review-climb-committed {
+  background: color-mix(in srgb, #7fd3ff 35%, transparent);
+  border-color: #7fd3ff;
+}
+
+.review-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  margin-left: -7px;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--ink);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.review-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #ff8a5c;
+  pointer-events: none;
+}
+
+.review-keys {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.review-loupe-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+}
+
+.review-loupe-strip {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.review-loupe-tile {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+  background: transparent;
+  color: var(--muted);
+  border: 2px solid transparent;
+  font-weight: 400;
+}
+
+.review-loupe-tile[aria-current='true'] {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.review-loupe-tile span {
+  display: block;
+  background-repeat: no-repeat;
+}
+
+.review-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.review-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+}
+
+.review-list li[data-selected='true'] {
+  border-color: var(--accent);
+}
+
+.review-list li[data-status='rejected'] .review-item-pick {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.review-item-pick {
+  background: transparent;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.review-tag {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.review-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.review-reprocess {
+  border-top: 1px solid #2a4a3f;
+  padding-top: 0.75rem;
+}
+
+.review-boulder,
+.review-quick,
+.review-tracks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+
+.review-tags {
+  min-width: 10rem;
+}
+
+.review-activity {
+  margin: 0;
+}
+
+.review-activity svg {
+  display: block;
+  width: 100%;
+  height: 3.25rem;
+  background: #0b1411;
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+}
+
+.review-activity-window {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.review-activity-energy {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-threshold {
+  stroke: #f0d0c8;
+  stroke-width: 1;
+  stroke-dasharray: 1.5 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-hip {
+  fill: none;
+  stroke: #7fd3ff;
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-wall {
+  fill: #7fd3ff;
+  opacity: 0.85;
+}
+
+.review-activity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

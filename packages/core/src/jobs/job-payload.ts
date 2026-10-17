@@ -5,3 +5,9 @@ export function videoIdOf(job: Job): string {
   if (typeof id !== 'string' || id === '') throw new Error('job missing videoId');
   return id;
 }
+
+/** `reprocess-recording` scope; import jobs carry none. */
+export function reprocessScopeOf(job: Job): 'active' | 'full' | null {
+  const scope = (job.payload as { scope?: unknown }).scope;
+  return scope === 'active' || scope === 'full' ? scope : null;
+}

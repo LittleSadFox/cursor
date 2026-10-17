@@ -2,56 +2,121 @@ import { InferenceSession, Tensor } from 'onnxruntime-node';
 
 export type PoseExecutionProvider = 'coreml' | 'cpu';
 
-export type OrtSessions = {
-  detector: InferenceSession;
-  pose: InferenceSession;
-  executionProvider: PoseExecutionProvider;
+/** The slice of `InferenceSession` the extractor uses; lets tests fake CoreML failures. */
+export type OrtSessionLike = {
+  readonly inputNames: readonly string[];
+  readonly outputNames: readonly string[];
+  run(feeds: InferenceSession.FeedsType): Promise<InferenceSession.ReturnType>;
+  release(): Promise<void>;
 };
 
-function preferredProviders(
-  platform: NodeJS.Platform,
-  arch: string,
-): { name: PoseExecutionProvider; list: string[] } {
-  // onnxruntime-node 1.30 uses short provider ids (`cpu`, `coreml`), not
-  // `CPUExecutionProvider` / `CoreMLExecutionProvider`.
-  if (platform === 'darwin' && arch === 'arm64') {
-    return { name: 'coreml', list: ['coreml', 'cpu'] };
-  }
-  return { name: 'cpu', list: ['cpu'] };
+export type OpenOrtSession = (
+  modelPath: string,
+  providers: readonly PoseExecutionProvider[],
+) => Promise<OrtSessionLike>;
+
+/** One model's session; moves itself to CPU when CoreML rejects a run. */
+export type PoseModelSession = {
+  readonly inputNames: readonly string[];
+  readonly outputNames: readonly string[];
+  provider(): PoseExecutionProvider;
+  run(feeds: InferenceSession.FeedsType): Promise<InferenceSession.ReturnType>;
+};
+
+export type OrtSessions = {
+  detector: PoseModelSession;
+  pose: PoseModelSession;
+  /** Provider of the pose model, the bulk of the compute. */
+  executionProvider(): PoseExecutionProvider;
+};
+
+type OpenedSession = { session: OrtSessionLike; provider: PoseExecutionProvider };
+
+// onnxruntime-node 1.30 uses short provider ids (`cpu`, `coreml`), not
+// `CPUExecutionProvider` / `CoreMLExecutionProvider`.
+const openOrtSession: OpenOrtSession = (modelPath, providers) =>
+  InferenceSession.create(modelPath, { executionProviders: [...providers] });
+
+export function preferredProvider(platform: NodeJS.Platform, arch: string): PoseExecutionProvider {
+  return platform === 'darwin' && arch === 'arm64' ? 'coreml' : 'cpu';
 }
 
-/** Lazy ONNX sessions. CoreML EP on macOS arm64; CPU everywhere else (Linux CI). */
+async function openOnCpu(modelPath: string, open: OpenOrtSession): Promise<OpenedSession> {
+  return { session: await open(modelPath, ['cpu']), provider: 'cpu' };
+}
+
+async function openPreferred(
+  modelPath: string,
+  preferred: PoseExecutionProvider,
+  open: OpenOrtSession,
+): Promise<OpenedSession> {
+  if (preferred === 'cpu') return openOnCpu(modelPath, open);
+  try {
+    return { session: await open(modelPath, ['coreml', 'cpu']), provider: 'coreml' };
+  } catch {
+    return openOnCpu(modelPath, open);
+  }
+}
+
+/**
+ * CoreML can accept a graph at load time and still fail at run time (static vs inferred
+ * output ranks). The first such failure reopens the model on CPU and retries the run.
+ */
+export async function openModelSession(
+  modelPath: string,
+  preferred: PoseExecutionProvider,
+  open: OpenOrtSession = openOrtSession,
+): Promise<PoseModelSession> {
+  let current = await openPreferred(modelPath, preferred, open);
+  let cpuFallback: Promise<OpenedSession> | null = null;
+
+  async function fallBackToCpu(failed: OpenedSession): Promise<OpenedSession> {
+    if (current !== failed) return current;
+    cpuFallback ??= openOnCpu(modelPath, open).then(async (opened) => {
+      current = opened;
+      await failed.session.release().catch(() => undefined);
+      return opened;
+    });
+    return cpuFallback;
+  }
+
+  return {
+    inputNames: current.session.inputNames,
+    outputNames: current.session.outputNames,
+    provider: () => current.provider,
+    async run(feeds) {
+      const attempt = current;
+      try {
+        return await attempt.session.run(feeds);
+      } catch (error) {
+        if (attempt.provider === 'cpu') throw error;
+        const cpu = await fallBackToCpu(attempt);
+        return cpu.session.run(feeds);
+      }
+    },
+  };
+}
+
+/**
+ * Lazy ONNX sessions. RTMDet's NMS output has a data-dependent shape that the CoreML EP
+ * cannot run, so the detector stays on CPU (it runs every few frames at 320²). RTMPose
+ * prefers CoreML on macOS arm64 and falls back to CPU on load or run failure.
+ */
 export async function openPoseSessions(
   detectorOnnx: string,
   poseOnnx: string,
-  options: { platform?: NodeJS.Platform; arch?: string } = {},
+  options: { platform?: NodeJS.Platform; arch?: string; open?: OpenOrtSession } = {},
 ): Promise<OrtSessions> {
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
-  const preferred = preferredProviders(platform, arch);
-  try {
-    const detector = await InferenceSession.create(detectorOnnx, {
-      executionProviders: preferred.list,
-    });
-    const pose = await InferenceSession.create(poseOnnx, {
-      executionProviders: preferred.list,
-    });
-    return { detector, pose, executionProvider: preferred.name };
-  } catch (error) {
-    if (preferred.name === 'cpu') throw error;
-    // CoreML EP missing or rejected — fall back to CPU and report honestly.
-    const detector = await InferenceSession.create(detectorOnnx, {
-      executionProviders: ['cpu'],
-    });
-    const pose = await InferenceSession.create(poseOnnx, {
-      executionProviders: ['cpu'],
-    });
-    return { detector, pose, executionProvider: 'cpu' };
-  }
+  const open = options.open ?? openOrtSession;
+  const detector = await openModelSession(detectorOnnx, 'cpu', open);
+  const pose = await openModelSession(poseOnnx, preferredProvider(platform, arch), open);
+  return { detector, pose, executionProvider: () => pose.provider() };
 }
 
 export async function runDetector(
-  session: InferenceSession,
+  session: PoseModelSession,
   tensor: Float32Array,
   size: number,
 ): Promise<{ dets: Float32Array; count: number }> {
@@ -68,7 +133,7 @@ export async function runDetector(
 }
 
 export async function runPose(
-  session: InferenceSession,
+  session: PoseModelSession,
   tensor: Float32Array,
   inputW: number,
   inputH: number,

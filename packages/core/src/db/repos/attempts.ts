@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne } from 'drizzle-orm';
 
 import { ProblemError } from '@climbing-coach/api';
 import type { MoveSegment } from '@climbing-coach/engine';
@@ -64,6 +64,27 @@ export function findPoseTrack(
     .limit(1)
     .get();
   return row ?? null;
+}
+
+/** Soft-deletes the video's older tracks of `kind`, keeping `keepId` (a full re-pose replaces them). */
+export function retireOlderPoseTracks(
+  db: AppDatabase,
+  videoId: string,
+  kind: string,
+  keepId: string,
+  nowIso: string,
+): void {
+  db.update(poseTracks)
+    .set({ deletedAt: nowIso, updatedAt: nowIso })
+    .where(
+      and(
+        eq(poseTracks.videoId, videoId),
+        eq(poseTracks.kind, kind),
+        ne(poseTracks.id, keepId),
+        isNull(poseTracks.deletedAt),
+      ),
+    )
+    .run();
 }
 
 /** `model@version`: comparisons need both attempts extracted with the same one. */

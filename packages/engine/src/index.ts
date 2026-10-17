@@ -42,6 +42,7 @@ export {
 } from './features/frame.js';
 
 export { estimateFloor } from './detect/floor.js';
+export { activityChart, ACTIVITY_CHART_POINTS, type ActivityChartPoint } from './detect/chart.js';
 export { detectorSignals } from './detect/signals.js';
 export {
   detectAttempts,

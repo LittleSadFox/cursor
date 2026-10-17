@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, type SQL } from 'drizzle-orm';
 
 import type { AppDatabase } from '../../ports/sql.js';
 import { reviewItems } from '../schema.js';
@@ -6,6 +6,9 @@ import { reviewItems } from '../schema.js';
 export type ReviewItemRow = {
   id: string;
   videoId: string;
+  origin: string;
+  /** Detector rows this one descends from (`derived_from_json`). */
+  parentIds: string[];
   outcome: string;
   climbStartUs: number;
   climbEndUs: number;
@@ -14,6 +17,14 @@ export type ReviewItemRow = {
   confidence: number | null;
   status: string;
   touched: boolean;
+} & ReviewRatingFields;
+
+/** Review-time rating; null until the user sets it. */
+export type ReviewRatingFields = {
+  boulderId: string | null;
+  proximity: number | null;
+  exertion: number | null;
+  tags: string[];
 };
 
 export type InsertReviewItemInput = {
@@ -29,11 +40,46 @@ export type InsertReviewItemInput = {
   parentIds: readonly string[];
 };
 
-export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+/** A row the user made in review: a manual add, or a split / merge of detector rows. */
+export type InsertUserReviewItemInput = {
+  id: string;
+  videoId: string;
+  origin: 'detector' | 'manual';
+  parentIds: readonly string[];
+  outcome: string;
+  climbStartUs: number;
+  climbEndUs: number;
+  prePadUs: number;
+  postPadUs: number;
+  status: 'draft' | 'rejected';
+} & ReviewRatingFields;
+
+export type ReviewItemPatch = {
+  parentIds: readonly string[];
+  outcome: string;
+  climbStartUs: number;
+  climbEndUs: number;
+  touched: boolean;
+  status: 'draft' | 'rejected';
+} & ReviewRatingFields;
+
+/** A JSON string array column; anything else reads as empty. */
+function parseIds(json: string): string[] {
+  try {
+    const value: unknown = JSON.parse(json);
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function selectReviewItems(db: AppDatabase, where: SQL | undefined): ReviewItemRow[] {
   return db
     .select({
       id: reviewItems.id,
       videoId: reviewItems.videoId,
+      origin: reviewItems.origin,
+      derivedFromJson: reviewItems.derivedFromJson,
       outcome: reviewItems.outcome,
       climbStartUs: reviewItems.climbStartUs,
       climbEndUs: reviewItems.climbEndUs,
@@ -42,12 +88,40 @@ export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow
       confidence: reviewItems.confidence,
       status: reviewItems.status,
       touched: reviewItems.touched,
+      boulderId: reviewItems.boulderId,
+      proximity: reviewItems.proximity,
+      exertion: reviewItems.exertion,
+      tagsJson: reviewItems.tagsJson,
     })
     .from(reviewItems)
-    .where(and(eq(reviewItems.videoId, videoId), isNull(reviewItems.deletedAt)))
+    .where(where)
     .orderBy(asc(reviewItems.climbStartUs), asc(reviewItems.id))
     .all()
-    .map((row) => ({ ...row, touched: row.touched === 1 }));
+    .map(({ derivedFromJson, tagsJson, touched, ...row }) => ({
+      ...row,
+      parentIds: parseIds(derivedFromJson),
+      tags: parseIds(tagsJson),
+      touched: touched === 1,
+    }));
+}
+
+export function listReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+  return selectReviewItems(
+    db,
+    and(eq(reviewItems.videoId, videoId), isNull(reviewItems.deletedAt)),
+  );
+}
+
+/** Soft-deleted, uncommitted rows: an undo across autosaves may bring one back. */
+export function listRetiredReviewItems(db: AppDatabase, videoId: string): ReviewItemRow[] {
+  return selectReviewItems(
+    db,
+    and(
+      eq(reviewItems.videoId, videoId),
+      isNotNull(reviewItems.deletedAt),
+      ne(reviewItems.status, 'committed'),
+    ),
+  );
 }
 
 export function insertReviewItem(
@@ -80,11 +154,72 @@ export function insertReviewItem(
     .run();
 }
 
-/** Soft-deletes review rows a newer detection replaced. */
+/** User rows have no detected range of their own; labels read it from their parents. */
+export function insertUserReviewItem(
+  db: AppDatabase,
+  input: InsertUserReviewItemInput,
+  nowIso: string,
+): void {
+  db.insert(reviewItems)
+    .values({
+      id: input.id,
+      videoId: input.videoId,
+      origin: input.origin,
+      derivedFromJson: JSON.stringify(input.parentIds),
+      climbStartUs: input.climbStartUs,
+      climbEndUs: input.climbEndUs,
+      prePadUs: input.prePadUs,
+      postPadUs: input.postPadUs,
+      outcome: input.outcome,
+      boulderId: input.boulderId,
+      proximity: input.proximity,
+      exertion: input.exertion,
+      tagsJson: JSON.stringify(input.tags),
+      touched: 1,
+      status: input.status,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    })
+    .run();
+}
+
+export function updateReviewItem(
+  db: AppDatabase,
+  id: string,
+  patch: ReviewItemPatch,
+  nowIso: string,
+): void {
+  db.update(reviewItems)
+    .set({
+      derivedFromJson: JSON.stringify(patch.parentIds),
+      outcome: patch.outcome,
+      climbStartUs: patch.climbStartUs,
+      climbEndUs: patch.climbEndUs,
+      boulderId: patch.boulderId,
+      proximity: patch.proximity,
+      exertion: patch.exertion,
+      tagsJson: JSON.stringify(patch.tags),
+      touched: patch.touched ? 1 : 0,
+      status: patch.status,
+      updatedAt: nowIso,
+    })
+    .where(eq(reviewItems.id, id))
+    .run();
+}
+
+/** Soft-deletes review rows a newer detection or a split / merge replaced. */
 export function retireReviewItems(db: AppDatabase, ids: readonly string[], nowIso: string): void {
   if (ids.length === 0) return;
   db.update(reviewItems)
     .set({ deletedAt: nowIso, updatedAt: nowIso })
+    .where(inArray(reviewItems.id, [...ids]))
+    .run();
+}
+
+export function reviveReviewItems(db: AppDatabase, ids: readonly string[], nowIso: string): void {
+  if (ids.length === 0) return;
+  db.update(reviewItems)
+    .set({ deletedAt: null, updatedAt: nowIso })
     .where(inArray(reviewItems.id, [...ids]))
     .run();
 }

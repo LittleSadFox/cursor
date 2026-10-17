@@ -1,7 +1,7 @@
 import { PARAMS_VERSION, STARTING_PARAMS, type DraftItem } from '@climbing-coach/engine';
 import { readPosebin, us, writePosebin, type SignalsFile } from '@climbing-coach/schema';
 
-import { findPoseTrack, insertPoseTrack } from '../db/repos/attempts.js';
+import { findPoseTrack, insertPoseTrack, retireOlderPoseTracks } from '../db/repos/attempts.js';
 import { insertReviewItem, listReviewItems, retireReviewItems } from '../db/repos/review.js';
 import { getVideo, updateVideo } from '../db/repos/videos.js';
 import { inTransaction } from '../db/tx.js';
@@ -24,7 +24,7 @@ import type { MediaFiles } from '../ports/media-files.js';
 import type { PoseExtractor } from '../ports/pose.js';
 import type { AppDatabase } from '../ports/sql.js';
 import type { VideoTools } from '../ports/video.js';
-import { videoIdOf } from './job-payload.js';
+import { reprocessScopeOf, videoIdOf } from './job-payload.js';
 import type { StepHandler } from './types.js';
 
 const DETECTION_FPS = STARTING_PARAMS.pose.detectionFps;
@@ -42,7 +42,8 @@ export type IngestHandlerDeps = {
 };
 
 /**
- * `activity → pose-detection → propose` of the import DAG (BUILD_PLAN §3.3). Each step
+ * `activity → pose-detection → propose` of the import DAG (BUILD_PLAN §3.3), and the
+ * `pose-detection → propose` steps of `reprocess`. Each step
  * hands off through the library (signals JSON, posebin, review rows), so a restart resumes
  * from whatever the previous step stored.
  */
@@ -98,14 +99,22 @@ export function ingestHandlers(deps: IngestHandlerDeps): Record<string, StepHand
     return { windows: file.activeWindows.length, samples: file.samples.length, dense };
   };
 
+  /** Whole recording for `reprocess full`; otherwise the stored activity windows. */
+  async function poseWindows(blobs: BlobStore, id: string, durationUs: number, full: boolean) {
+    if (full) return detectionWindows(null, durationUs);
+    return detectionWindows(await readSignals(blobs, id), durationUs);
+  }
+
   const poseDetection: StepHandler = async ({ job, signal }) => {
+    const scope = reprocessScopeOf(job);
+    if (scope === 'active') return { skipped: true, reason: 'detection reuses the stored track' };
     const { pose, blobs, ids } = deps;
     if (!pose?.ready() || !blobs || !ids) {
       return { skipped: true, reason: 'pose runtime unavailable' };
     }
     const id = videoIdOf(job);
     const row = getVideo(db, id);
-    const windows = detectionWindows(await readSignals(blobs, id), row.durationUs ?? 0);
+    const windows = await poseWindows(blobs, id, row.durationUs ?? 0, scope === 'full');
     const abort = signal ? { signal } : {};
     const summary = await pose.extract(
       video.frames(files.absolute(row.path), {
@@ -146,6 +155,7 @@ export function ingestHandlers(deps: IngestHandlerDeps): Record<string, StepHand
       },
       clock.nowIso(),
     );
+    retireOlderPoseTracks(db, id, 'detection', poseTrackId, clock.nowIso());
     return { poseTrackId, framesProcessed: summary.framesProcessed, persons: summary.persons };
   };
 
@@ -204,5 +214,7 @@ export function ingestHandlers(deps: IngestHandlerDeps): Record<string, StepHand
     'import-recording.activity': activity,
     'import-recording.pose-detection': poseDetection,
     'import-recording.propose': propose,
+    'reprocess-recording.pose-detection': poseDetection,
+    'reprocess-recording.propose': propose,
   };
 }
