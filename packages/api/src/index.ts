@@ -1,5 +1,19 @@
 export { API_VERSION } from './version.js';
 export {
+  ActivityEnergySchema,
+  ActivityHipSchema,
+  ActivityTrackSchema,
+  PosePeopleSchema,
+  PosePersonSchema,
+  SelectPoseTrackSchema,
+  type ActivityEnergy,
+  type ActivityHip,
+  type ActivityTrack,
+  type PosePeople,
+  type PosePerson,
+  type SelectPoseTrack,
+} from './activity.js';
+export {
   HealthResponseSchema,
   RuntimeStatusSchema,
   defaultHealth,

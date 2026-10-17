@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-import type { ReviewState } from '@climbing-coach/api';
+import type { ReviewRating, ReviewState } from '@climbing-coach/api';
 import type { AttemptOutcome } from '@climbing-coach/schema';
 
 import type { DraftRow } from './draft.js';
@@ -16,6 +16,7 @@ import {
   rejectItem,
   restoreItem,
   setOutcome,
+  setRating,
   splitAt,
   stepItem,
   type Edge,
@@ -56,6 +57,7 @@ export type ReviewEditor = {
   restore: (id: string) => void;
   merge: (id: string) => void;
   outcome: (id: string, outcome: AttemptOutcome) => void;
+  rating: (id: string, patch: Partial<ReviewRating>) => void;
   onKey: (action: ReviewKeyAction) => void;
 };
 
@@ -153,6 +155,8 @@ export function useReviewEditor({
   const restore = (id: string) => edit((current) => restoreItem(current, id));
   const outcome = (id: string, value: AttemptOutcome) =>
     edit((current) => setOutcome(current, id, value));
+  const rating = (id: string, patch: Partial<ReviewRating>) =>
+    edit((current) => setRating(current, id, patch));
 
   const next = (direction: 1 | -1) => {
     const id = stepItem(present, state.selectedId, direction);
@@ -179,6 +183,8 @@ export function useReviewEditor({
       case 'undo':
       case 'redo':
         return dispatch({ type: action.type });
+      case 'proximity':
+        return state.selectedId ? rating(state.selectedId, { proximity: action.value }) : undefined;
     }
   };
 
@@ -199,6 +205,7 @@ export function useReviewEditor({
     restore,
     merge,
     outcome,
+    rating,
     onKey,
   };
 }

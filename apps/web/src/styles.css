@@ -681,3 +681,68 @@ button:disabled {
   border-top: 1px solid #2a4a3f;
   padding-top: 0.75rem;
 }
+
+.review-boulder,
+.review-quick,
+.review-tracks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+
+.review-tags {
+  min-width: 10rem;
+}
+
+.review-activity {
+  margin: 0;
+}
+
+.review-activity svg {
+  display: block;
+  width: 100%;
+  height: 3.25rem;
+  background: #0b1411;
+  border: 1px solid #2a4a3f;
+  border-radius: 8px;
+}
+
+.review-activity-window {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.review-activity-energy {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-threshold {
+  stroke: #f0d0c8;
+  stroke-width: 1;
+  stroke-dasharray: 1.5 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-hip {
+  fill: none;
+  stroke: #7fd3ff;
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.review-activity-wall {
+  fill: #7fd3ff;
+  opacity: 0.85;
+}
+
+.review-activity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

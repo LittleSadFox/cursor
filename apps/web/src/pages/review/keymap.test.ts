@@ -23,6 +23,8 @@ describe('reviewKeyAction', () => {
       type: 'next',
       direction: -1,
     });
+    expect(reviewKeyAction(key('1'))).toEqual({ type: 'proximity', value: 1 });
+    expect(reviewKeyAction(key('5'))).toEqual({ type: 'proximity', value: 5 });
   });
 
   it('maps undo and redo on Cmd or Ctrl', () => {
@@ -37,6 +39,8 @@ describe('reviewKeyAction', () => {
     expect(reviewKeyAction(key('S', { shiftKey: true }))).toBeNull();
     expect(reviewKeyAction(key('i', { altKey: true }))).toBeNull();
     expect(reviewKeyAction(key('x'))).toBeNull();
+    expect(reviewKeyAction(key('1', { shiftKey: true }))).toBeNull();
+    expect(reviewKeyAction(key('Enter'))).toBeNull();
   });
 });
 

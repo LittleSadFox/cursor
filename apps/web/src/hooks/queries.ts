@@ -160,6 +160,33 @@ export function useLoupe(id: string, atUs: number | null) {
   });
 }
 
+export function useActivity(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['recordings', id, 'activity'],
+    queryFn: () => api.review.activity(id),
+    enabled,
+    staleTime: Infinity,
+  });
+}
+
+export function usePoseTracks(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['recordings', id, 'tracks'],
+    queryFn: () => api.review.tracks(id),
+    enabled,
+  });
+}
+
+export function useSelectTrack(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (trackId: string) => api.review.selectTrack(id, { trackId }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['recordings', id] });
+    },
+  });
+}
+
 export function useSetReviewState() {
   const client = useQueryClient();
   return (state: ReviewState) => client.setQueryData(reviewKey(state.recordingId), state);

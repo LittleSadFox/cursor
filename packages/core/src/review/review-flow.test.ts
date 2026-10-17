@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ProblemError, type ReviewItem, type ReviewItemInput } from '@climbing-coach/api';
+import { STARTING_PARAMS } from '@climbing-coach/engine';
+import { readPosebin, writePosebin } from '@climbing-coach/schema';
 
 import { DURATION_US, fakeVideoTools, importWith, secondFrames } from '../test/ingest-fakes.js';
 
@@ -147,5 +149,49 @@ describe('review draft', () => {
     expect(seen).toHaveLength(posed);
     expect((await api.recordings.get(id)).jobStatus).toBe('succeeded');
     expect((await api.review.get(id)).items).toHaveLength(1);
+  });
+
+  it('draws activity from the stored signals and re-detects a chosen climber', async () => {
+    const { api, blobs, id } = await importedReview();
+    const activity = await api.review.activity(id);
+    expect(activity.energyThreshold).toBe(STARTING_PARAMS.activity.energyThreshold);
+    expect(activity.samples.length).toBeGreaterThan(0);
+    expect(activity.activeWindows.length).toBeGreaterThan(0);
+    expect(activity.hip?.length).toBeGreaterThan(0);
+
+    const people = await api.review.tracks(id);
+    const current = people.tracks[0];
+    if (!current?.selected) throw new Error('expected one selected climber');
+    expect(
+      await codeOf(api.review.selectTrack(id, { trackId: '01ARZ3NDEKTSV4RRFFQ69G5FAX' })),
+    ).toBe('VALIDATION_FAILED');
+
+    const path = [...blobs.files.keys()].find((key) => key.endsWith('.detection.posebin'));
+    if (!path) throw new Error('no detection posebin');
+    const pose = readPosebin(await blobs.read(path));
+    const other = '01ARZ3NDEKTSV4RRFFQ69G5FAX';
+    const buffer = pose.landmarksByTrack.get(current.trackId);
+    if (!buffer) throw new Error('no landmarks');
+    await blobs.write(
+      path,
+      writePosebin({
+        ...pose,
+        header: {
+          ...pose.header,
+          tracks: [
+            ...pose.header.tracks,
+            { trackId: other, firstFrame: 0, lastFrame: pose.header.frameCount - 1 },
+          ],
+        },
+        landmarksByTrack: new Map([...pose.landmarksByTrack, [other, buffer]]),
+      }),
+    );
+
+    const before = await api.review.get(id);
+    const selected = await api.review.selectTrack(id, { trackId: other });
+    expect(selected.tracks.find((track) => track.selected)?.trackId).toBe(other);
+    expect((await api.review.get(id)).revision).toBe(before.revision);
+    const back = await api.review.selectTrack(id, { trackId: current.trackId });
+    expect(back.tracks.find((track) => track.selected)?.trackId).toBe(current.trackId);
   });
 });

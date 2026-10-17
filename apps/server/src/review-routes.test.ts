@@ -185,6 +185,24 @@ describe('review routes', () => {
     expect((stale.json() as { code: string }).code).toBe('REVIEW_REVISION_CONFLICT');
   });
 
+  it('serves an empty activity lane before pose has run', async () => {
+    const { app, id } = await setup(dirs, apps);
+    const activity = await app.inject({
+      method: 'GET',
+      url: `/api/v1/recordings/${id}/activity`,
+      headers: AUTH,
+    });
+    expect(activity.statusCode).toBe(200);
+    expect(activity.json()).toMatchObject({ energyThreshold: 0.01, hip: null });
+    const tracks = await app.inject({
+      method: 'GET',
+      url: `/api/v1/recordings/${id}/tracks`,
+      headers: AUTH,
+    });
+    expect(tracks.statusCode).toBe(200);
+    expect(tracks.json()).toEqual({ tracks: [] });
+  });
+
   it('refuses a full reprocess without the pose runtime', async () => {
     const { app, id } = await setup(dirs, apps);
     const response = await app.inject({

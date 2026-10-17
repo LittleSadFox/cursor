@@ -1,3 +1,4 @@
+import { ActivityTrackSchema, PosePeopleSchema } from './activity.js';
 import type { Boulder, BoulderInput, BoulderListQuery, BoulderPatch } from './boulders.js';
 import type { CoachApi } from './coach-api.js';
 import type { Accepted, Id, Page } from './common.js';
@@ -181,6 +182,12 @@ export function createHttpCoachApi(options: HttpClientOptions): CoachApi {
       get: async (id) => ReviewStateSchema.parse(await request('GET', `/recordings/${id}/review`)),
       save: async (id, input: ReviewSave) =>
         ReviewSavedSchema.parse(await request('PUT', `/recordings/${id}/review`, input)),
+      activity: async (id) =>
+        ActivityTrackSchema.parse(await request('GET', `/recordings/${id}/activity`)),
+      tracks: async (id) =>
+        PosePeopleSchema.parse(await request('GET', `/recordings/${id}/tracks`)),
+      selectTrack: async (id, input) =>
+        PosePeopleSchema.parse(await request('POST', `/recordings/${id}/tracks`, input)),
     },
     comparisons: {
       create: (input) => comparison('POST', '/comparisons', input),

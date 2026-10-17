@@ -1,10 +1,12 @@
 import { useLingui } from '@lingui/react';
 
+import type { ReviewRating } from '@climbing-coach/api';
 import { AttemptOutcomeSchema, type AttemptOutcome } from '@climbing-coach/schema';
 
 import { translate } from '../../format.js';
 import { isEditable, type DraftRow } from './draft.js';
 import { canRestore, mergePartner } from './draft-ops.js';
+import { ReviewRatingFields, type BoulderOption } from './review-rating.js';
 import { formatSeconds } from './timeline-math.js';
 
 export type ListActions = {
@@ -13,6 +15,9 @@ export type ListActions = {
   onReject: (id: string) => void;
   onRestore: (id: string) => void;
   onMerge: (id: string) => void;
+  onRating: (id: string, patch: Partial<ReviewRating>) => void;
+  boulders: readonly BoulderOption[];
+  onCreateBoulder: (input: { grade: string; name: string }) => Promise<string>;
 };
 
 function originLabel(row: DraftRow): string {
@@ -70,6 +75,12 @@ function ItemActions({
       <button type="button" className="ghost" onClick={() => actions.onReject(row.id)}>
         {i18n._('review.reject')}
       </button>
+      <ReviewRatingFields
+        row={row}
+        boulders={actions.boulders}
+        onRating={actions.onRating}
+        onCreate={actions.onCreateBoulder}
+      />
     </>
   );
 }

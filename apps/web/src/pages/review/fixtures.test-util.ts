@@ -1,6 +1,6 @@
 import type { ReviewItem } from '@climbing-coach/api';
 
-import { DEFAULT_PADDING, type DraftRow } from './draft.js';
+import { DEFAULT_PADDING, NO_RATING, type DraftRow } from './draft.js';
 
 export const A = '01ARZ3NDEKTSV4RRFFQ69G5FA1';
 export const B = '01ARZ3NDEKTSV4RRFFQ69G5FA2';
@@ -22,6 +22,7 @@ export function detector(
     outcome: 'unknown',
     touched: false,
     status: 'draft',
+    ...NO_RATING,
     ...extra,
   } satisfies DraftRow;
 }

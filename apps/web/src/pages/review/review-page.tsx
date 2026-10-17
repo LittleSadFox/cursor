@@ -5,13 +5,17 @@ import type { FilmstripQuery, Recording, ReviewState } from '@climbing-coach/api
 
 import { errorText } from '../../format.js';
 import {
+  useActivity,
   useFilmstrip,
   useHealth,
   useLoupe,
+  usePoseTracks,
   useRecording,
   useReprocess,
   useReviewState,
+  useSelectTrack,
 } from '../../hooks/queries.js';
+import { ActivityLane } from './activity-lane.js';
 import { isLive } from './draft.js';
 import { canRedo, canUndo, isDirty } from './history.js';
 import { ReviewList } from './review-list.js';
@@ -19,6 +23,8 @@ import { ReviewLoupe } from './review-loupe.js';
 import { reprocessGate, reviewNotice } from './review-gate.js';
 import { ReviewTimeline } from './review-timeline.js';
 import { ReprocessPanel, ReviewToolbar } from './review-toolbar.js';
+import { TrackPicker } from './track-picker.js';
+import { useReviewCatalog } from './use-review-catalog.js';
 import { FILMSTRIP_TILE_WIDTH, loupeCenterUs } from './timeline-math.js';
 import { usePlayer } from './use-player.js';
 import { useReviewEditor } from './use-review-editor.js';
@@ -46,6 +52,11 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
   useReviewKeys(editor.onKey);
   const health = useHealth();
   const reprocess = useReprocess(recording.id);
+  const ready = review.processing.complete;
+  const activity = useActivity(recording.id, ready);
+  const tracks = usePoseTracks(recording.id, ready);
+  const selectTrack = useSelectTrack(recording.id);
+  const catalog = useReviewCatalog();
   const filmstrip = useFilmstrip(recording.id, filmstripQuery(review, durationUs));
   const { selected, edge } = editor;
   const edgeUs = selected
@@ -73,6 +84,16 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
       ) : (
         <p>{i18n._('recordings.proxyWait')}</p>
       )}
+      <TrackPicker
+        tracks={tracks.data?.tracks ?? []}
+        pending={selectTrack.isPending}
+        error={selectTrack.error}
+        onSelect={(trackId) => {
+          void flush().then((clean) => {
+            if (clean) selectTrack.mutate(trackId);
+          });
+        }}
+      />
       <ReviewToolbar
         currentUs={player.currentUs}
         durationUs={durationUs}
@@ -100,6 +121,7 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
         onSelect={(id) => editor.draft.dispatch({ type: 'select', id })}
         onDragEdge={editor.dragEdge}
       />
+      <ActivityLane track={activity.data} durationUs={durationUs} />
       <p className="lede review-keys">{i18n._('review.keys')}</p>
       {selected ? (
         <ReviewLoupe
@@ -120,6 +142,10 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
           onReject: editor.reject,
           onRestore: editor.restore,
           onMerge: editor.merge,
+          onRating: editor.rating,
+          boulders: catalog.boulders,
+          onCreateBoulder: (input) =>
+            catalog.createBoulder({ ...input, gymName: i18n._('review.defaultGym') }),
         }}
       />
       <ReprocessPanel
@@ -127,7 +153,9 @@ function ReviewEditor({ recording, review }: { recording: Recording; review: Rev
         pending={reprocess.isPending}
         error={reprocess.error}
         onReprocess={() => {
-          void flush().then(() => reprocess.mutate('full'));
+          void flush().then((clean) => {
+            if (clean) reprocess.mutate('full');
+          });
         }}
       />
     </>

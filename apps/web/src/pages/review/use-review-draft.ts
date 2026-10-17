@@ -26,8 +26,8 @@ export type ReviewDraft = {
   newId: NewId;
   saveStatus: SaveStatus;
   saveError: unknown;
-  /** Saves now if there is anything to save. */
-  flush: () => Promise<void>;
+  /** Saves now. Resolves true when the stored draft matches the editor. */
+  flush: () => Promise<boolean>;
 };
 
 function isConflict(error: unknown): boolean {
@@ -91,7 +91,8 @@ export function useReviewDraft(recordingId: string, server: ReviewState | undefi
 
   const flush = useCallback(async () => {
     const current = stateRef.current;
-    if (!current.loaded || !isDirty(current) || saving.current) return;
+    if (!current.loaded || saving.current) return false;
+    if (!isDirty(current)) return true;
     saving.current = true;
     setSaveStatus('saving');
     try {
@@ -104,6 +105,7 @@ export function useReviewDraft(recordingId: string, server: ReviewState | undefi
       setSaveError(null);
       setFailedSeq(null);
       setSaveStatus('saved');
+      return true;
     } catch (error) {
       if (isConflict(error)) {
         await rebase().catch((reload: unknown) => setSaveError(reload));
@@ -113,6 +115,7 @@ export function useReviewDraft(recordingId: string, server: ReviewState | undefi
         setFailedSeq(current.seq);
         setSaveStatus('error');
       }
+      return false;
     } finally {
       saving.current = false;
     }

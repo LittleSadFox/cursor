@@ -1,5 +1,7 @@
 import {
   ProblemError,
+  type ActivityTrack,
+  type PosePeople,
   type ReviewItemInput,
   type ReviewSave,
   type ReviewSaved,
@@ -20,18 +22,22 @@ import {
 import { getVideo, updateVideo } from '../db/repos/videos.js';
 import { inTransaction } from '../db/tx.js';
 import type { IdGen } from '../ids/ulid.js';
+import type { BlobStore } from '../ports/blobs.js';
 import type { Clock } from '../ports/clock.js';
 import type { EventBus } from '../ports/events.js';
 import type { AppDatabase } from '../ports/sql.js';
 import { jobActive, jobOf } from '../recordings/job-of.js';
+import { loadActivityTrack } from './activity.js';
 import { toReviewItem } from './items.js';
 import { planReviewSave, type SavePlan } from './save-plan.js';
+import { listDetectionTracks, selectDetectionTrack } from './tracks.js';
 
 export type ReviewDeps = {
   db: AppDatabase;
   clock: Clock;
   ids: IdGen;
   events?: EventBus | undefined;
+  blobs?: BlobStore | undefined;
 };
 
 function reviewStateOf(value: string): ReviewState['reviewState'] {
@@ -128,6 +134,16 @@ export function createReviewService(deps: ReviewDeps) {
       const revision = apply(recordingId, plan);
       deps.events?.publish({ type: 'review.updated', recordingId, revision });
       return { ...state(recordingId), idMap: plan.idMap };
+    },
+    activity(recordingId: string): Promise<ActivityTrack> {
+      getVideo(db, recordingId);
+      return loadActivityTrack(db, deps.blobs, recordingId);
+    },
+    tracks(recordingId: string): Promise<PosePeople> {
+      return listDetectionTracks(deps, recordingId);
+    },
+    selectTrack(recordingId: string, input: { trackId: string }): Promise<PosePeople> {
+      return selectDetectionTrack(deps, recordingId, input.trackId);
     },
   };
 }

@@ -12,6 +12,7 @@ import {
   rejectItem,
   restoreItem,
   setOutcome,
+  setRating,
   splitAt,
   stepItem,
 } from './draft-ops.js';
@@ -122,6 +123,27 @@ describe('reject, restore, add, outcome', () => {
     const next = setOutcome(rows, A, 'top');
     expect(next[0]).toMatchObject({ outcome: 'top', touched: true });
     expect(setOutcome(next, A, 'top')).toBe(next);
+  });
+
+  it('copies a rating through a split and keeps the later climb on a merge', () => {
+    const rated = [
+      detector(A, 10_000_000, 20_000_000, { proximity: 2, boulderId: C }),
+      detector(B, 30_000_000, 40_000_000, { proximity: 5, tags: ['crimp'] }),
+    ];
+    expect(splitAt(rated, 15_000_000, ids()).slice(0, 2)).toEqual([
+      expect.objectContaining({ proximity: 2, boulderId: C }),
+      expect.objectContaining({ proximity: 2, boulderId: C }),
+    ]);
+    expect(mergeWithNext(rated, A, ids())[0]).toMatchObject({ proximity: 5, tags: ['crimp'] });
+  });
+
+  it('gives an added climb the previous boulder and stores a rating on save', () => {
+    const rated = [detector(A, 0, 5_000_000, { boulderId: C, proximity: 3 })];
+    const added = addAt(rated, 8_000_000, DURATION_US, ids());
+    expect(added[1]).toMatchObject({ boulderId: C, proximity: null, tags: [] });
+    const saved = toSaveItems(setRating(added, A, { exertion: 6, tags: ['dyno'] }));
+    expect(saved[0]).toMatchObject({ boulderId: C, proximity: 3, exertion: 6, tags: ['dyno'] });
+    expect(setRating(rated, A, { proximity: 3 })).toBe(rated);
   });
 
   it('steps through items with wrap-around', () => {

@@ -128,7 +128,13 @@ export function createCoreApi(deps: CoreDeps): CoachApi & {
     trash,
     videos: createVideoService({ db, blobs: deps.blobs }),
     recordings,
-    review: createReviewService({ db, clock, ids: deps.ids, events: deps.events }),
+    review: createReviewService({
+      db,
+      clock,
+      ids: deps.ids,
+      events: deps.events,
+      blobs: deps.blobs,
+    }),
     comparisons: createComparisonService({
       db,
       clock,

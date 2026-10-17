@@ -14,6 +14,7 @@ import {
   RecordingImportSchema,
   RecordingReprocessSchema,
   ReviewSaveSchema,
+  SelectPoseTrackSchema,
   type CoachApi,
 } from '@climbing-coach/api';
 
@@ -38,6 +39,13 @@ export function registerRecordingRoutes(app: FastifyInstance, api: CoachApi): vo
   app.get('/api/v1/recordings/:id/review', async (request) => api.review.get(idParam(request)));
   app.put('/api/v1/recordings/:id/review', async (request) =>
     api.review.save(idParam(request), ReviewSaveSchema.parse(request.body)),
+  );
+  app.get('/api/v1/recordings/:id/activity', async (request) =>
+    api.review.activity(idParam(request)),
+  );
+  app.get('/api/v1/recordings/:id/tracks', async (request) => api.review.tracks(idParam(request)));
+  app.post('/api/v1/recordings/:id/tracks', async (request) =>
+    api.review.selectTrack(idParam(request), SelectPoseTrackSchema.parse(request.body)),
   );
   app.post('/api/v1/recordings/:id/reprocess', async (request, reply) => {
     const accepted = await api.recordings.reprocess(

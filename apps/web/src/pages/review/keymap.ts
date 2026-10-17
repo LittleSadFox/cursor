@@ -10,7 +10,8 @@ export type ReviewKeyAction =
   | { type: 'reject' }
   | { type: 'next'; direction: 1 | -1 }
   | { type: 'undo' }
-  | { type: 'redo' };
+  | { type: 'redo' }
+  | { type: 'proximity'; value: 1 | 2 | 3 | 4 | 5 };
 
 export type KeyInput = {
   key: string;
@@ -61,5 +62,13 @@ export function reviewKeyAction(event: KeyInput): ReviewKeyAction | null {
   if (event.key === 'Delete' || event.key === 'Backspace') return { type: 'reject' };
   if (event.key === 'Tab') return { type: 'next', direction: event.shiftKey ? -1 : 1 };
   if (event.shiftKey && event.key.length === 1) return null;
-  return arrowKey(event) ?? letterKey(event.key);
+  return arrowKey(event) ?? letterKey(event.key) ?? proximityKey(event.key);
+}
+
+/** `1`–`5` set proximity on the selected climb. */
+function proximityKey(key: string): ReviewKeyAction | null {
+  if (key.length !== 1 || key < '1' || key > '5') return null;
+  const value = Number(key);
+  if (value < 1 || value > 5) return null;
+  return { type: 'proximity', value: value as 1 | 2 | 3 | 4 | 5 };
 }

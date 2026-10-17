@@ -4,6 +4,7 @@ import type {
   ReviewOrigin,
   ReviewPadding,
   ReviewRange,
+  ReviewRating,
   ReviewStatus,
 } from '@climbing-coach/api';
 import {
@@ -24,7 +25,26 @@ export type DraftRow = {
   outcome: AttemptOutcome;
   touched: boolean;
   status: ReviewStatus;
+} & ReviewRating;
+
+/** What a row made from other rows (split, merge, add) inherits besides its range. */
+export type RowBase = Pick<DraftRow, 'padding' | keyof ReviewRating>;
+
+export const NO_RATING: ReviewRating = {
+  boulderId: null,
+  proximity: null,
+  exertion: null,
+  tags: [],
 };
+
+export function ratingOf(row: ReviewRating): ReviewRating {
+  return {
+    boulderId: row.boulderId,
+    proximity: row.proximity,
+    exertion: row.exertion,
+    tags: row.tags,
+  };
+}
 
 export const DEFAULT_PADDING: ReviewPadding = {
   preUs: STARTING_PARAMS.padding.preUs,
@@ -41,6 +61,7 @@ export function fromServer(item: ReviewItem): DraftRow {
     outcome: item.outcome,
     touched: item.touched,
     status: item.status,
+    ...ratingOf(item),
   };
 }
 
@@ -59,15 +80,20 @@ export function isEditable(row: DraftRow): boolean {
 
 /** Autosave body. Committed rows never change, so they are not sent. */
 export function toSaveItems(rows: readonly DraftRow[]): ReviewItemInput[] {
-  return rows.filter(isEditable).map((row) => ({
-    id: row.id,
-    origin: row.origin,
-    parentIds: [...row.parentIds],
-    climb: row.climb,
-    outcome: row.outcome,
-    touched: row.touched,
-    status: row.status === 'rejected' ? 'rejected' : 'draft',
-  }));
+  return rows.filter(isEditable).map((row) => {
+    const rating = ratingOf(row);
+    return {
+      id: row.id,
+      origin: row.origin,
+      parentIds: [...row.parentIds],
+      climb: row.climb,
+      outcome: row.outcome,
+      touched: row.touched,
+      status: row.status === 'rejected' ? 'rejected' : 'draft',
+      ...rating,
+      tags: [...rating.tags],
+    };
+  });
 }
 
 /** Engine source, inferred from lineage: a detector row lists only itself. */
@@ -89,17 +115,18 @@ export function toDraftItem(row: DraftRow): DraftItem {
   };
 }
 
-/** Engine result back into a row; padding comes from the row it replaced. */
-export function fromDraftItem(item: DraftItem, padding: ReviewPadding): DraftRow {
+/** Engine result back into a row; padding and rating come from the row it replaced. */
+export function fromDraftItem(item: DraftItem, base: RowBase): DraftRow {
   return {
     id: item.id,
     origin: item.parentIds.length === 0 ? 'manual' : 'detector',
     parentIds: item.parentIds,
     climb: item.climb,
-    padding,
+    padding: base.padding,
     outcome: item.outcome,
     touched: item.touched,
     status: item.rejected ? 'rejected' : 'draft',
+    ...ratingOf(base),
   };
 }
 

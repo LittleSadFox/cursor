@@ -16,6 +16,10 @@ function item(status: ReviewItem['status']): ReviewItem {
     confidence: null,
     touched: false,
     status,
+    boulderId: null,
+    proximity: null,
+    exertion: null,
+    tags: [],
   };
 }
 

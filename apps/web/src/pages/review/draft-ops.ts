@@ -1,4 +1,4 @@
-import type { ReviewRange } from '@climbing-coach/api';
+import type { ReviewRange, ReviewRating } from '@climbing-coach/api';
 import { manualItem, mergeItems, splitItem } from '@climbing-coach/engine';
 import type { AttemptOutcome } from '@climbing-coach/schema';
 
@@ -7,6 +7,7 @@ import {
   fromDraftItem,
   isEditable,
   isLive,
+  NO_RATING,
   sortRows,
   toDraftItem,
   type DraftRow,
@@ -107,10 +108,7 @@ export function splitAt(rows: readonly DraftRow[], tUs: number, newId: NewId): r
     left: newId(),
     right: newId(),
   });
-  return replaceRow(rows, row.id, [
-    fromDraftItem(left, row.padding),
-    fromDraftItem(right, row.padding),
-  ]);
+  return replaceRow(rows, row.id, [fromDraftItem(left, row), fromDraftItem(right, row)]);
 }
 
 /** The next live climb after `id`, if it can merge with it. */
@@ -121,7 +119,10 @@ export function mergePartner(rows: readonly DraftRow[], id: string): DraftRow | 
   return next && isEditable(next) ? next : undefined;
 }
 
-/** Merge a climb with the next live climb (engine `mergeItems`); rejected rows between stay. */
+/**
+ * Merge a climb with the next live climb (engine `mergeItems`); rejected rows between stay.
+ * Like the outcome, the rating comes from the later climb.
+ */
 export function mergeWithNext(
   rows: readonly DraftRow[],
   id: string,
@@ -130,10 +131,10 @@ export function mergeWithNext(
   const row = editableRow(rows, id);
   const next = mergePartner(rows, id);
   if (!row || !next) return rows;
-  const merged = fromDraftItem(
-    mergeItems(toDraftItem(row), toDraftItem(next), newId()),
-    row.padding,
-  );
+  const merged = fromDraftItem(mergeItems(toDraftItem(row), toDraftItem(next), newId()), {
+    ...next,
+    padding: row.padding,
+  });
   return sortRows([...rows.filter((other) => other.id !== row.id && other.id !== next.id), merged]);
 }
 
@@ -171,6 +172,14 @@ export function addRange(
   return endUs - startUs >= MIN_CLIMB_US ? { startUs, endUs } : null;
 }
 
+/** The live climb that ends last before `tUs`. */
+export function previousLive(rows: readonly DraftRow[], tUs: number): DraftRow | undefined {
+  return otherLive(rows, null)
+    .filter((row) => row.climb.endUs <= tUs)
+    .at(-1);
+}
+
+/** An added climb is usually another go on the same boulder, so it takes the previous one's. */
 export function addAt(
   rows: readonly DraftRow[],
   tUs: number,
@@ -179,7 +188,12 @@ export function addAt(
 ): readonly DraftRow[] {
   const range = addRange(rows, tUs, durationUs);
   if (!range) return rows;
-  return sortRows([...rows, fromDraftItem(manualItem(newId(), range), DEFAULT_PADDING)]);
+  const boulderId = previousLive(rows, range.startUs)?.boulderId ?? null;
+  const item = manualItem(newId(), range);
+  return sortRows([
+    ...rows,
+    fromDraftItem(item, { padding: DEFAULT_PADDING, ...NO_RATING, boulderId }),
+  ]);
 }
 
 export function setOutcome(
@@ -190,6 +204,28 @@ export function setOutcome(
   const row = editableRow(rows, id);
   if (!row || row.outcome === outcome) return rows;
   return replaceRow(rows, id, [{ ...row, outcome, touched: true }]);
+}
+
+function sameRating(a: ReviewRating, b: ReviewRating): boolean {
+  return (
+    a.boulderId === b.boulderId &&
+    a.proximity === b.proximity &&
+    a.exertion === b.exertion &&
+    a.tags.length === b.tags.length &&
+    a.tags.every((tag, index) => tag === b.tags[index])
+  );
+}
+
+export function setRating(
+  rows: readonly DraftRow[],
+  id: string,
+  patch: Partial<ReviewRating>,
+): readonly DraftRow[] {
+  const row = editableRow(rows, id);
+  if (!row) return rows;
+  const next = { ...row, ...patch };
+  if (sameRating(row, next)) return rows;
+  return replaceRow(rows, id, [{ ...next, touched: true }]);
 }
 
 /** Next (or previous) item for Tab navigation, wrapping around. */

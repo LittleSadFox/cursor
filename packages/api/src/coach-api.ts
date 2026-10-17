@@ -1,3 +1,4 @@
+import type { ActivityTrack, PosePeople, SelectPoseTrack } from './activity.js';
 import type {
   Boulder,
   BoulderInput,
@@ -116,6 +117,12 @@ export type CoachApi = {
     get(recordingId: Id): Promise<ReviewState>;
     /** Autosave. Rejects a stale `baseRevision` with `REVIEW_REVISION_CONFLICT`. */
     save(recordingId: Id, input: ReviewSave): Promise<ReviewSaved>;
+    /** Energy, active windows, and hip speed for the review activity lane. */
+    activity(recordingId: Id): Promise<ActivityTrack>;
+    /** People in the detection posebin. Empty until pose has run. */
+    tracks(recordingId: Id): Promise<PosePeople>;
+    /** Use this person for detection and merge the new proposals into the draft. */
+    selectTrack(recordingId: Id, input: SelectPoseTrack): Promise<PosePeople>;
   };
   comparisons: {
     /** Cached result (`ready`) or a `pending` comparison carrying the `compare` job id. */
