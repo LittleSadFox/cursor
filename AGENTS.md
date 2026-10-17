@@ -56,7 +56,7 @@ Dependency direction (enforced by `pnpm deps:check`):
 
 ```bash
 pnpm install
-pnpm build
+pnpm build   # full compile; optional before `dev` — server/web `dev` rebuild deps via turbo
 ```
 
 ## Commands
