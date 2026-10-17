@@ -15,7 +15,13 @@ export {
   type RandomBytes,
 } from './ids/ulid.js';
 export { createJobRunner, type JobRunner } from './jobs/runner.js';
-export { COMPARE_PIPELINE, CORE_PIPELINES, P2A_PIPELINES } from './jobs/pipelines.js';
+export {
+  COMPARE_PIPELINE,
+  CORE_PIPELINES,
+  CUT_PIPELINE,
+  IMPORT_PIPELINE,
+  P2A_PIPELINES,
+} from './jobs/pipelines.js';
 export {
   alignmentRegressionCases,
   type AlignmentRegressionCase,
@@ -26,4 +32,27 @@ export { addDaysIso } from './library/retention.js';
 export { systemClock, isoFromMs, type Clock } from './ports/clock.js';
 export { createEventBus, type EventBus } from './ports/events.js';
 export { silentLogger, type Logger } from './ports/logger.js';
+export type { MediaFiles } from './ports/media-files.js';
+export type {
+  PoseExtractOptions,
+  PoseExtractSummary,
+  PoseExtractor,
+  PoseProgress,
+  PoseRuntimeInfo,
+} from './ports/pose.js';
 export type { AppDatabase, SqlExecutor, SqlValue, SqliteBackup } from './ports/sql.js';
+export type {
+  CutMode,
+  CutResult,
+  FrameWindowOptions,
+  HdrTransfer,
+  PacketFrame,
+  ProbeResult,
+  SpriteLayout,
+  SpriteTile,
+  TaskOpts,
+  TimeRange,
+  VideoFrame,
+  VideoTools,
+} from './ports/video.js';
+export { VideoToolError } from './ports/video.js';

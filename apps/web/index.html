@@ -4,9 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Climbing Coach</title>
+    <!-- Load CSS without waiting on the module graph so a failed JS import is not a blank page. -->
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-fallback" class="panel boot-fallback" role="status">
+        <p><strong>Climbing Coach</strong> is starting…</p>
+        <p>
+          If this message stays, the web app failed to load. Open the browser console, run
+          <code>pnpm build</code> from the repo root, then
+          <code>pnpm --filter @climbing-coach/web dev</code> on
+          <code>http://127.0.0.1:5173/</code>. The local API must also be running:
+          <code>pnpm --filter @climbing-coach/server dev</code> →
+          <code>http://127.0.0.1:8787/api/v1/health</code>.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

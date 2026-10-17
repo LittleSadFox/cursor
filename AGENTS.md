@@ -56,7 +56,7 @@ Dependency direction (enforced by `pnpm deps:check`):
 
 ```bash
 pnpm install
-pnpm build
+pnpm build   # full compile; optional before `dev` — server/web `dev` rebuild deps via turbo
 ```
 
 ## Commands
@@ -73,6 +73,7 @@ pnpm build
 | API server        | `pnpm --filter @climbing-coach/server dev` → `GET /api/v1/health` (dev token `dev-token`) |
 | Schema only       | `pnpm --filter @climbing-coach/schema test`                                               |
 | Python posebin    | `python3 -m pytest research/pose-lab/tests -q`                                            |
+| Fetch pose ONNX   | `node scripts/pose/fetch-models.mjs` (checksummed; writes `vendor/pose/models/`)           |
 
 CI: `.github/workflows/ci.yml` (Linux lint/typecheck/test/deps + Python posebin; macOS arm64
 schema smoke + LGPL ffmpeg build/verify). PR checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
@@ -98,18 +99,25 @@ schema smoke + LGPL ffmpeg build/verify). PR checklist: `.github/PULL_REQUEST_TE
 
 ## What exists today vs later
 
-**In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), and
-Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell + homepage
-training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades` are
-pure. Health is `degraded` until the pose runtime ships; the P0.8 locator reports
-bundled/env ffmpeg only (Linux PATH is a non-shipping fallback). Phase 3 (P3.1–P3.5):
-`engine/compare` posture deltas + per-move text, `compare` job pipeline with a cached
-`comparisons` table (migration 0002), `/comparisons` + `/videos/:id/pose` routes, and the web
-`/compare` view (playback controller, skeleton/ghost renderer, divergence timeline, move panel,
-alignment feedback labels).
+**In tree now:** Phase 0 foundations, Phase 1 pure engine (P1.1–P1.6, P1.9–P1.10), P1.7 video
+tools (probe, quick/full hash, frame source, H.264 proxy, lossless/reencode/auto cut,
+thumbnail/filmstrip/loupe) behind a core `VideoTools` port, P1.8 pose adapter (RTMDet-nano +
+RTMPose-m Halpe-26 on `onnxruntime-node`; ADR-001 Accepted provisional), and the smallest
+recordings import on `/recordings` (upload or absolute path, probe, proxy, cut, detection pose
+job, skeleton overlay). P2-B.1 slice: keyframe activity (`signals/<videoId>.json`), detection
+pose on those windows (whole recording if the pass finds none), and detector proposals listed
+on the recording with a cut of the padded range. Phase 2-A: SQLite library DB, core services, Fastify auth/SSE, web shell
++ homepage training log, Electron `app://-` protocol helpers. `engine/stats` and `engine/grades`
+are pure. Health is `ok` only when both ffmpeg and pose weights are present; the P0.8 locator
+reports bundled/env ffmpeg only (Linux PATH can run tools but `ffmpeg.available` stays false).
+Phase 3 (P3.1–P3.5): `engine/compare` posture deltas + per-move text, `compare` job pipeline with
+a cached `comparisons` table (migration 0002), `/comparisons` + `/videos/:id/pose` routes, and
+the web `/compare` view (playback controller, skeleton/ghost renderer, divergence timeline, move
+panel, alignment feedback labels).
 
-**Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off / adapter
-(P0.5–P0.6, P1.8), P1.7 video tools (P0.8 locator is in tree; ADR-002 still Proposed), ingest/review (P2-B),
-library/player/rating (P2-C), Electron packaging (P2-D), comparison video playback and
-export (P3.6, ADR-002), wall-relative ghost alignment, mobile. Implement those only when the
-matching phase item says so and prerequisites exist.
+**Blocked / not built yet:** real dataset media (P0.3, P1.11), pose bake-off accuracy gates
+(P0.5–P0.6), Apple signing (ADR-002 stays Proposed), the rest of review (P2-B.2 filmstrip,
+loupe, undo, split/merge; P2-B.3 commit into attempts, clip pose, moves), library/player/rating
+(P2-C), Electron packaging (P2-D), comparison video playback and export (P3.6), wall-relative
+ghost alignment, mobile.
+Implement those only when the matching phase item says so and prerequisites exist.

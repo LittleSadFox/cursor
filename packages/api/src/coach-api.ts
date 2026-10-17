@@ -17,6 +17,8 @@ import type { CoachEvent, EventHandler } from './events.js';
 import type { Gym, GymInput, GymListQuery, GymPatch } from './gyms.js';
 import type { HealthResponse } from './health.js';
 import type { Job, JobQuery } from './jobs.js';
+import type { Recording, RecordingAccepted, RecordingCut, RecordingImport } from './recordings.js';
+import type { ReviewItem } from './review.js';
 import type { Session, SessionInput, SessionListQuery, SessionPatch } from './sessions.js';
 import type { Settings, SettingsPatch } from './settings.js';
 import type {
@@ -39,8 +41,10 @@ export type Crud<T, Input, Patch, ListQ extends ListQuery = ListQuery> = {
 
 /**
  * Public application surface (BUILD_PLAN §4.6).
- * Video ingest, review, and bundles are not exposed until P2-B. Comparisons (P3.2) work on
- * attempts that already have HQ pose tracks; export throws FFMPEG_UNAVAILABLE until ADR-002.
+ * Video ingest covers import, probe, hash, proxy, cut, activity windows, detection pose,
+ * and proposed climbs. Filmstrip, loupe, and commit-to-attempt stay later.
+ * Comparisons (P3.2) work on
+ * attempts that already have HQ pose tracks; export throws FFMPEG_UNAVAILABLE until P3.6.
  */
 export type CoachApi = {
   system: {
@@ -87,6 +91,15 @@ export type CoachApi = {
   videos: {
     /** posebin bytes for the video's pose track, sliced to `[fromUs, toUs)`. */
     pose(id: Id, q?: VideoPoseQuery): Promise<Uint8Array>;
+  };
+  recordings: {
+    list(): Promise<Recording[]>;
+    get(id: Id): Promise<Recording>;
+    /** Copy, move, or reference a file already on disk. Returns before probe and proxy finish. */
+    importPath(input: RecordingImport): Promise<RecordingAccepted>;
+    cut(id: Id, input: RecordingCut): Promise<RecordingAccepted>;
+    /** Detector proposals for one recording, oldest climb first. */
+    review(id: Id): Promise<ReviewItem[]>;
   };
   comparisons: {
     /** Cached result (`ready`) or a `pending` comparison carrying the `compare` job id. */

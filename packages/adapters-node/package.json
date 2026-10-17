@@ -21,7 +21,8 @@
     "@climbing-coach/core": "workspace:*",
     "@climbing-coach/schema": "workspace:*",
     "better-sqlite3": "^12.4.1",
-    "drizzle-orm": "^0.44.5"
+    "drizzle-orm": "^0.44.5",
+    "onnxruntime-node": "^1.30.0"
   },
   "devDependencies": {
     "@climbing-coach/config": "workspace:*",

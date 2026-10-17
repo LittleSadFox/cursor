@@ -45,6 +45,9 @@ jobs:
           python3 -m pip install --user pytest
           python3 -m pytest research/pose-lab/tests -q
 
+      - name: Fetch pose ONNX weights (checksummed)
+        run: node scripts/pose/fetch-models.mjs
+
       - name: Test
         run: pnpm test
 

@@ -120,7 +120,8 @@ describe('HTTP security', () => {
       url: `/api/v1/media/videos/${VIDEO_ID}?variant=proxy&sig=${sig}`,
       headers: { host: '127.0.0.1:8787' },
     });
-    expect(signed.json().code).toBe('FFMPEG_UNAVAILABLE');
+    expect(signed.statusCode).toBe(404);
+    expect(signed.json().code).toBe('NOT_FOUND');
 
     const forged = await app.inject({
       method: 'GET',

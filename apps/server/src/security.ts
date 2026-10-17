@@ -17,7 +17,7 @@ export const SIGNED_URL_PREFIX = '/api/v1/media/';
 const LOOPBACK_NAMES = new Set(['127.0.0.1', 'localhost']);
 
 export const CORS_HEADERS = {
-  'access-control-allow-headers': 'Authorization, Content-Type, Last-Event-ID',
+  'access-control-allow-headers': 'Authorization, Content-Type, Last-Event-ID, X-Filename',
   'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 } as const;
 

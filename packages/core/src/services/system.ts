@@ -13,6 +13,8 @@ export type SystemDeps = {
   ffmpegVersion?: string | null;
   ffmpegNote?: string;
   poseAvailable: boolean;
+  poseVersion?: string | null;
+  poseNote?: string;
   /** Persists the library location outside the library itself; takes effect on next launch. */
   onLibraryRootChange?: ((root: string | null) => void) | undefined;
 };
@@ -44,12 +46,14 @@ export function createSystemService(deps: SystemDeps): CoachApi['system'] {
         },
         pose: {
           available: deps.poseAvailable,
-          version: null,
-          note: healthNote(
-            deps.poseAvailable,
-            'pose runtime ready',
-            'Pose adapter arrives with ADR-001; not bundled yet.',
-          ),
+          version: deps.poseVersion ?? null,
+          note:
+            deps.poseNote ??
+            healthNote(
+              deps.poseAvailable,
+              'pose runtime ready',
+              'Pose weights missing. Run scripts/pose/fetch-models.mjs (ADR-001).',
+            ),
         },
       });
     },
