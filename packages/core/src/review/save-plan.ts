@@ -5,6 +5,7 @@ import type {
   InsertUserReviewItemInput,
   ReviewItemPatch,
   ReviewItemRow,
+  ReviewRatingFields,
 } from '../db/repos/review.js';
 
 export type SavePlan = {
@@ -96,6 +97,24 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
+function ratingOf(item: ReviewItemInput): ReviewRatingFields {
+  return {
+    boulderId: item.boulderId,
+    proximity: item.proximity,
+    exertion: item.exertion,
+    tags: item.tags,
+  };
+}
+
+function ratingChanged(row: ReviewItemRow, item: ReviewItemInput): boolean {
+  return (
+    row.boulderId !== item.boulderId ||
+    row.proximity !== item.proximity ||
+    row.exertion !== item.exertion ||
+    !sameIds(row.tags, item.tags)
+  );
+}
+
 /** Stored patch for an edited row, or null when nothing changed. Any change marks it touched. */
 export function changedPatch(row: ReviewItemRow, item: ReviewItemInput): ReviewItemPatch | null {
   const edited =
@@ -103,7 +122,8 @@ export function changedPatch(row: ReviewItemRow, item: ReviewItemInput): ReviewI
     row.climbEndUs !== item.climb.endUs ||
     row.outcome !== item.outcome ||
     row.status !== item.status ||
-    !sameIds(row.parentIds, item.parentIds);
+    !sameIds(row.parentIds, item.parentIds) ||
+    ratingChanged(row, item);
   const touched = row.touched || item.touched || edited;
   if (!edited && touched === row.touched) return null;
   return {
@@ -113,6 +133,7 @@ export function changedPatch(row: ReviewItemRow, item: ReviewItemInput): ReviewI
     climbEndUs: item.climb.endUs,
     touched,
     status: item.status,
+    ...ratingOf(item),
   };
 }
 
@@ -132,6 +153,7 @@ function insertFor(
     prePadUs: input.padding.preUs,
     postPadUs: input.padding.postUs,
     status: item.status,
+    ...ratingOf(item),
   };
 }
 

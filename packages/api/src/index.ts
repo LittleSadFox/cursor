@@ -167,9 +167,11 @@ export {
 } from './recordings.js';
 export { CoachEventSchema, type CoachEvent, type EventHandler } from './events.js';
 export {
+  ExertionSchema,
   FilmstripQuerySchema,
   LoupeQuerySchema,
   NEW_REVIEW_ITEM_ID,
+  ProximitySchema,
   RecordingReprocessSchema,
   ReprocessScopeSchema,
   ReviewItemInputSchema,
@@ -178,10 +180,12 @@ export {
   ReviewPaddingSchema,
   ReviewProcessingSchema,
   ReviewRangeSchema,
+  ReviewRatingSchema,
   ReviewSavedSchema,
   ReviewSaveSchema,
   ReviewStateSchema,
   ReviewStatusSchema,
+  ReviewTagsSchema,
   SpriteSchema,
   SpriteTileSchema,
   type FilmstripQuery,
@@ -194,6 +198,7 @@ export {
   type ReviewPadding,
   type ReviewProcessing,
   type ReviewRange,
+  type ReviewRating,
   type ReviewSave,
   type ReviewSaved,
   type ReviewState,

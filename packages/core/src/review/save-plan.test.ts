@@ -23,6 +23,10 @@ function row(id: string, startUs: number, endUs: number, extra: Partial<ReviewIt
     confidence: null,
     status: 'draft',
     touched: false,
+    boulderId: null,
+    proximity: null,
+    exertion: null,
+    tags: [],
     ...extra,
   } satisfies ReviewItemRow;
 }
@@ -41,6 +45,10 @@ function input(
     outcome: 'fall',
     touched: false,
     status: 'draft',
+    boulderId: null,
+    proximity: null,
+    exertion: null,
+    tags: [],
     ...extra,
   };
 }
@@ -95,6 +103,10 @@ describe('planReviewSave', () => {
           climbEndUs: 1_000,
           touched: true,
           status: 'draft',
+          boulderId: null,
+          proximity: null,
+          exertion: null,
+          tags: [],
         },
       },
     ]);
@@ -157,6 +169,25 @@ describe('planReviewSave', () => {
 });
 
 describe('changedPatch', () => {
+  it('stores a rating and marks the row touched', () => {
+    const patch = changedPatch(
+      row(A, 0, 1_000),
+      input(A, 0, 1_000, { boulderId: B, proximity: 4, exertion: 7, tags: ['crimp'] }),
+    );
+    expect(patch).toEqual(
+      expect.objectContaining({
+        boulderId: B,
+        proximity: 4,
+        exertion: 7,
+        tags: ['crimp'],
+        touched: true,
+      }),
+    );
+    expect(
+      changedPatch(row(A, 0, 1_000, { tags: ['crimp'] }), input(A, 0, 1_000, { tags: ['crimp'] })),
+    ).toBeNull();
+  });
+
   it('records a reject as a touched status change', () => {
     expect(changedPatch(row(A, 0, 1_000), input(A, 0, 1_000, { status: 'rejected' }))).toEqual(
       expect.objectContaining({ status: 'rejected', touched: true }),

@@ -1,11 +1,13 @@
 import {
   ProblemError,
+  type ReviewItemInput,
   type ReviewSave,
   type ReviewSaved,
   type ReviewState,
 } from '@climbing-coach/api';
 import { STARTING_PARAMS } from '@climbing-coach/engine';
 
+import { getBoulder } from '../db/repos/boulders.js';
 import {
   insertUserReviewItem,
   listRetiredReviewItems,
@@ -13,6 +15,7 @@ import {
   retireReviewItems,
   reviveReviewItems,
   updateReviewItem,
+  type ReviewItemRow,
 } from '../db/repos/review.js';
 import { getVideo, updateVideo } from '../db/repos/videos.js';
 import { inTransaction } from '../db/tx.js';
@@ -33,6 +36,27 @@ export type ReviewDeps = {
 
 function reviewStateOf(value: string): ReviewState['reviewState'] {
   return value === 'in_review' || value === 'done' ? value : 'unreviewed';
+}
+
+/** A newly picked boulder must exist; one picked earlier may since have gone to the trash. */
+function assertBoulders(
+  db: AppDatabase,
+  items: readonly ReviewItemInput[],
+  rows: readonly ReviewItemRow[],
+): void {
+  const stored = new Map(rows.map((row) => [row.id, row.boulderId]));
+  const picked = new Set(
+    items.flatMap((item) =>
+      item.boulderId !== null && stored.get(item.id) !== item.boulderId ? [item.boulderId] : [],
+    ),
+  );
+  for (const id of picked) {
+    try {
+      getBoulder(db, id);
+    } catch {
+      throw new ProblemError('VALIDATION_FAILED', `Unknown boulder ${id}.`);
+    }
+  }
 }
 
 /** Review draft load and autosave (BUILD_PLAN §3.2 `ReviewService`, minus commit). */
@@ -89,10 +113,13 @@ export function createReviewService(deps: ReviewDeps) {
           `The review changed (revision ${row.reviewRevision}); reload and merge your edits.`,
         );
       }
+      const existing = listReviewItems(db, recordingId);
+      const retired = listRetiredReviewItems(db, recordingId);
+      assertBoulders(db, input.items, [...retired, ...existing]);
       const plan = planReviewSave({
         videoId: recordingId,
-        existing: listReviewItems(db, recordingId),
-        retired: listRetiredReviewItems(db, recordingId),
+        existing,
+        retired,
         items: input.items,
         durationUs: row.durationUs,
         padding: STARTING_PARAMS.padding,

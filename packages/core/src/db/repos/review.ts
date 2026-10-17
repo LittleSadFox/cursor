@@ -17,6 +17,14 @@ export type ReviewItemRow = {
   confidence: number | null;
   status: string;
   touched: boolean;
+} & ReviewRatingFields;
+
+/** Review-time rating; null until the user sets it. */
+export type ReviewRatingFields = {
+  boulderId: string | null;
+  proximity: number | null;
+  exertion: number | null;
+  tags: string[];
 };
 
 export type InsertReviewItemInput = {
@@ -44,7 +52,7 @@ export type InsertUserReviewItemInput = {
   prePadUs: number;
   postPadUs: number;
   status: 'draft' | 'rejected';
-};
+} & ReviewRatingFields;
 
 export type ReviewItemPatch = {
   parentIds: readonly string[];
@@ -53,8 +61,9 @@ export type ReviewItemPatch = {
   climbEndUs: number;
   touched: boolean;
   status: 'draft' | 'rejected';
-};
+} & ReviewRatingFields;
 
+/** A JSON string array column; anything else reads as empty. */
 function parseIds(json: string): string[] {
   try {
     const value: unknown = JSON.parse(json);
@@ -79,14 +88,19 @@ function selectReviewItems(db: AppDatabase, where: SQL | undefined): ReviewItemR
       confidence: reviewItems.confidence,
       status: reviewItems.status,
       touched: reviewItems.touched,
+      boulderId: reviewItems.boulderId,
+      proximity: reviewItems.proximity,
+      exertion: reviewItems.exertion,
+      tagsJson: reviewItems.tagsJson,
     })
     .from(reviewItems)
     .where(where)
     .orderBy(asc(reviewItems.climbStartUs), asc(reviewItems.id))
     .all()
-    .map(({ derivedFromJson, touched, ...row }) => ({
+    .map(({ derivedFromJson, tagsJson, touched, ...row }) => ({
       ...row,
       parentIds: parseIds(derivedFromJson),
+      tags: parseIds(tagsJson),
       touched: touched === 1,
     }));
 }
@@ -157,7 +171,10 @@ export function insertUserReviewItem(
       prePadUs: input.prePadUs,
       postPadUs: input.postPadUs,
       outcome: input.outcome,
-      tagsJson: '[]',
+      boulderId: input.boulderId,
+      proximity: input.proximity,
+      exertion: input.exertion,
+      tagsJson: JSON.stringify(input.tags),
       touched: 1,
       status: input.status,
       createdAt: nowIso,
@@ -178,6 +195,10 @@ export function updateReviewItem(
       outcome: patch.outcome,
       climbStartUs: patch.climbStartUs,
       climbEndUs: patch.climbEndUs,
+      boulderId: patch.boulderId,
+      proximity: patch.proximity,
+      exertion: patch.exertion,
+      tagsJson: JSON.stringify(patch.tags),
       touched: patch.touched ? 1 : 0,
       status: patch.status,
       updatedAt: nowIso,

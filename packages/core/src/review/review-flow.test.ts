@@ -13,6 +13,10 @@ function asInput(item: ReviewItem, extra: Partial<ReviewItemInput> = {}): Review
     outcome: item.outcome,
     touched: item.touched,
     status: item.status === 'rejected' ? 'rejected' : 'draft',
+    boulderId: item.boulderId,
+    proximity: item.proximity,
+    exertion: item.exertion,
+    tags: item.tags,
     ...extra,
   };
 }
@@ -80,6 +84,33 @@ describe('review draft', () => {
     expect(undone.items.map((item) => [item.id, item.climb])).toEqual([
       [detected.id, detected.climb],
     ]);
+  });
+
+  it('stores a rating with a boulder and refuses an unknown boulder', async () => {
+    const { api, id, state, detected } = await importedReview();
+    const gym = await api.gyms.create({ name: 'Home wall', notes: '' });
+    const boulder = await api.boulders.create({ gymId: gym.id, grade: 'V4', color: 'red' });
+    const saved = await api.review.save(id, {
+      baseRevision: state.revision,
+      items: [
+        asInput(detected, { boulderId: boulder.id, proximity: 4, exertion: 7, tags: ['crimp'] }),
+      ],
+    });
+    expect(saved.items[0]).toMatchObject({
+      boulderId: boulder.id,
+      proximity: 4,
+      exertion: 7,
+      tags: ['crimp'],
+      touched: true,
+    });
+    expect(
+      await codeOf(
+        api.review.save(id, {
+          baseRevision: saved.revision,
+          items: [asInput(detected, { boulderId: '01ARZ3NDEKTSV4RRFFQ69G5FAV' })],
+        }),
+      ),
+    ).toBe('VALIDATION_FAILED');
   });
 
   it('rejects a stale base revision', async () => {

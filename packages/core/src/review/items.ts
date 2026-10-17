@@ -49,5 +49,9 @@ export function toReviewItem(row: ReviewItemRow, durationUs: number): ReviewItem
     confidence: row.confidence,
     touched: row.touched,
     status,
+    boulderId: row.boulderId,
+    proximity: row.proximity,
+    exertion: row.exertion,
+    tags: row.tags,
   };
 }

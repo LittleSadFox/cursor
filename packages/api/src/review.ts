@@ -17,6 +17,29 @@ export type ReviewPadding = z.infer<typeof ReviewPaddingSchema>;
 export const ReviewOriginSchema = z.enum(['detector', 'manual']);
 export type ReviewOrigin = z.infer<typeof ReviewOriginSchema>;
 
+export const ProximitySchema = z.number().int().min(1).max(5);
+export const ExertionSchema = z.number().int().min(1).max(10);
+export const ReviewTagsSchema = z.array(z.string().trim().min(1).max(40)).max(20);
+
+/** What the user records about a climb during review; it carries over to the attempt at commit. */
+export const ReviewRatingSchema = z.object({
+  boulderId: UlidSchema.nullable(),
+  /** 1–5: how close to sending. */
+  proximity: ProximitySchema.nullable(),
+  /** 1–10 (CR10). */
+  exertion: ExertionSchema.nullable(),
+  tags: ReviewTagsSchema,
+});
+export type ReviewRating = z.infer<typeof ReviewRatingSchema>;
+
+/** Autosave input: a client that does not rate yet may leave the rating out. */
+const ReviewRatingInputSchema = z.object({
+  boulderId: UlidSchema.nullable().default(null),
+  proximity: ProximitySchema.nullable().default(null),
+  exertion: ExertionSchema.nullable().default(null),
+  tags: ReviewTagsSchema.default([]),
+});
+
 export const ReviewStatusSchema = z.enum(['draft', 'rejected', 'committed']);
 export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
 
@@ -25,18 +48,20 @@ export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
  * `padding`, clamped to the recording, and is read-only. `parentIds` are the detector rows
  * this item descends from through splits and merges (empty for a manual add).
  */
-export const ReviewItemSchema = z.object({
-  id: UlidSchema,
-  origin: ReviewOriginSchema,
-  parentIds: z.array(UlidSchema),
-  climb: ReviewRangeSchema,
-  padding: ReviewPaddingSchema,
-  clip: ReviewRangeSchema,
-  outcome: AttemptOutcomeSchema,
-  confidence: z.number().nullable(),
-  touched: z.boolean(),
-  status: ReviewStatusSchema,
-});
+export const ReviewItemSchema = z
+  .object({
+    id: UlidSchema,
+    origin: ReviewOriginSchema,
+    parentIds: z.array(UlidSchema),
+    climb: ReviewRangeSchema,
+    padding: ReviewPaddingSchema,
+    clip: ReviewRangeSchema,
+    outcome: AttemptOutcomeSchema,
+    confidence: z.number().nullable(),
+    touched: z.boolean(),
+    status: ReviewStatusSchema,
+  })
+  .merge(ReviewRatingSchema);
 export type ReviewItem = z.infer<typeof ReviewItemSchema>;
 
 export const ReviewProcessingSchema = z.object({
@@ -61,15 +86,17 @@ export type ReviewState = z.infer<typeof ReviewStateSchema>;
 /** Client-made rows carry a temporary id until the save that stores them returns `idMap`. */
 export const NEW_REVIEW_ITEM_ID = /^new-[a-z0-9]{1,40}$/;
 
-export const ReviewItemInputSchema = z.object({
-  id: z.union([UlidSchema, z.string().regex(NEW_REVIEW_ITEM_ID)]),
-  origin: ReviewOriginSchema,
-  parentIds: z.array(UlidSchema).max(64),
-  climb: ReviewRangeSchema,
-  outcome: AttemptOutcomeSchema,
-  touched: z.boolean(),
-  status: z.enum(['draft', 'rejected']),
-});
+export const ReviewItemInputSchema = z
+  .object({
+    id: z.union([UlidSchema, z.string().regex(NEW_REVIEW_ITEM_ID)]),
+    origin: ReviewOriginSchema,
+    parentIds: z.array(UlidSchema).max(64),
+    climb: ReviewRangeSchema,
+    outcome: AttemptOutcomeSchema,
+    touched: z.boolean(),
+    status: z.enum(['draft', 'rejected']),
+  })
+  .merge(ReviewRatingInputSchema);
 export type ReviewItemInput = z.infer<typeof ReviewItemInputSchema>;
 
 /** Autosave body. Committed rows are never sent and never change. */

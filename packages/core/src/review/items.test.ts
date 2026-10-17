@@ -19,6 +19,10 @@ function row(extra: Partial<ReviewItemRow> = {}): ReviewItemRow {
     confidence: null,
     status: 'draft',
     touched: false,
+    boulderId: null,
+    proximity: null,
+    exertion: null,
+    tags: [],
     ...extra,
   };
 }
